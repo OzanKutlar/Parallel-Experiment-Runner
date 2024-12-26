@@ -26,7 +26,7 @@ Cyan = "\033[36m"
 RESET = "\033[0m"
 
 
-ROWS_PER_COLUMN = 25  # Number of rows that fit into a single terminal column
+ROWS_PER_COLUMN = 20  # Number of rows that fit into a single terminal column
 COLUMN_DIST = 30
 
 class MyRequestHandler(BaseHTTPRequestHandler):
@@ -288,15 +288,7 @@ if __name__ == "__main__":
         bbbc_params
     )
     
-    data_two, id_counter = generate_combined_data(
-        shared_params2,
-        id_counter,
-        ga_params,
-        de_params,
-        pso_params
-    )
-    
-    data_array = data_one + data_two
+    data_array = data_one
     # print_list_as_json(data_array)
     # display_object_attributes(data_array)
     # exit()
@@ -348,7 +340,6 @@ if __name__ == "__main__":
         server.server_close()
         server_thread.join()
         print("Server stopped.")
-
 
 
 
