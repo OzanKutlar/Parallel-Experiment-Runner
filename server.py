@@ -289,7 +289,7 @@ if __name__ == "__main__":
     )
     
     data_array = data_one
-    # print_list_as_json(data_array)
+    print_list_as_json(data_array)
     # display_object_attributes(data_array)
     # exit()
     server = HTTPServer((host, port), MyRequestHandler)
