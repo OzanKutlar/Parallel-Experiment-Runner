@@ -136,7 +136,7 @@
         }
 		
 		function changeBox(boxNumber) {
-			var box = document.getElementById('box-' + number);
+			var box = document.getElementById('box-' + boxNumber);
 
 			box.querySelector('div').textContent = 'Given';
 
