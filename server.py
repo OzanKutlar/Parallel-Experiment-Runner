@@ -270,49 +270,6 @@ def merge_objects(dict1, dict2):
     return merged
     
 
-shared_params = {
-    "task":["firstTask", "secondTask", "thirdTask"],
-    "pop": [500],
-    "runs": [30],
-    "generation": [350]
-}
-
-shared_params2 = {
-    "task":["firstTask", "secondTask", "thirdTask"],
-    "pop": [500],
-    "runs": [20],
-    "generation": [350]
-}
-
-ga_params = {
-    "algo": ["ga"],
-    "mut": [-1.0, 0.2, 0.4, 0.6],
-    "cross": [0.5, 0.419, 0.381],
-    "elitist": ["elitist_full"]
-
-}
-
-de_params = {
-    "algo": ["de"],
-    "variant": [1, 2, 3, 4, 5, 6],
-    "scalingFactor": [0.5, 0.75, 1.0]
-    
-}
-
-pso_params = {
-    "algo": ["pso"],
-    "omega": [0.6, 0.8, 1.0],
-    "cognitiveConstant": [0.5, 2.5, 5.0],
-    "socialConstant": [0.5, 2.5, 5.0]
-
-}
-
-bbbc_params = {
-    "runs": [50],
-    "algo": ["bbbc"]
-
-}
-
 def generate_combined_data(shared_params, id_counter, *param_sets):
     combined_data_array = []
 
@@ -378,19 +335,43 @@ if __name__ == "__main__":
         data_index.append(0)
     # print(data_index[-1])
     id_counter = 1
-    data_one, id_counter = generate_combined_data(
-        shared_params,
-        id_counter,
-        ga_params,
-        de_params,
-        pso_params,
-        bbbc_params
-    )
     
-    data_array = data_one
-    # print_list_as_json(data_array)
-    # display_object_attributes(data_array)
-    # exit()
+    py_files = [f for f in os.listdir('.') if os.path.isfile(f) and f.endswith('.py') and f != os.path.basename(__file__)]
+
+    if not py_files:
+        print("No Python files found, starting with empty data.")
+    else:
+        if len(py_files) == 1:
+            data_file = py_files[0]
+            print(f"Found only one Python file: {data_file}")
+            should_load = input(f"Do you want to load data from {data_file}? (Y/n): ").strip().lower()
+            should_load = should_load in ("", "yes", "y")
+
+        else:
+            print("Multiple Python files found:")
+            for idx, file in enumerate(py_files, start=1):
+                print(f"{idx}. {file}")
+            while True:
+                try:
+                    choice = int(input("Choose a file to load (enter the number): ").strip())
+                    if 1 <= choice <= len(py_files):
+                        data_file = py_files[choice - 1]
+                        should_load = input(f"Do you want to load data from {data_file}? (Y/n): ").strip().lower()
+                        should_load = should_load in ("", "yes", "y")
+                    else:
+                        print("Invalid selection.")
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+    
+    if not should_load:
+        print("No parameters. No experiments.");
+        return
+    with open(data_file, "r") as f:
+        code = f.read()  # Read the script content
+
+    exec(code)  # Execute the script dynamically
+
+    
     server = HTTPServer((host, port), MyRequestHandler)
 
     server_thread = threading.Thread(target=start_server, args=(server,), daemon=True)
