@@ -52,7 +52,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             # Get 'lastLog' from headers or default to 0
             last_log = int(self.headers.get('lastLog', len(logs) - 6))  # Default to 0 if not provided
             # Get logs after the 'lastLog' index
-            relevant_logs = logs[last_log:last_log+5]  # Get 5 logs after the 'lastLog' index
+            relevant_logs = logs[last_log+1:last_log+5]  # Get 5 logs after the 'lastLog' index
             # Send response in JSON format
             self.send_response(200)
             self.send_header("Content-type", "application/json")
