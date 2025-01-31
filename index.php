@@ -91,7 +91,7 @@
 		let lastState = -1; // Initialize lastLog variable
 		
         function fetchLogs() {
-            const serverUrl = "http://" + window.location.hostname + ":3753/logs";
+            let serverUrl = "http://" + window.location.hostname + ":3753/logs";
 			
 			const headers = {};
 			
