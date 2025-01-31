@@ -121,9 +121,10 @@
 				method: 'GET',
 				headers: headers
 			})
+            .then(response => response.json())
             .then(data => {
                 console.log("Logs received:", data);
-                alert(data);
+                alert(JSON.stringify(data, null, 2));
             })
             .catch(error => console.error("Error fetching logs:", error));
         }
