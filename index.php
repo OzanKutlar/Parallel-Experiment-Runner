@@ -86,15 +86,19 @@
     </div>
     
     <script>
+		let lastLog = null; // Initialize lastLog variable
+		
         function fetchLogs() {
             const serverUrl = "http://" + window.location.hostname + ":3753/logs";
 
-            fetch(serverUrl, {
-                method: 'GET',
-                headers: {
-                    'lastLog': '0'  // Can be dynamically set if needed
-                }
-            })
+            if (lastLog) {
+				headers['lastLog'] = lastLog;
+			}
+
+			fetch(serverUrl, {
+				method: 'GET',
+				headers: headers
+			})
             .then(response => response.json())
             .then(data => {
                 console.log("Logs received:", data);
@@ -117,6 +121,7 @@
 
                 announcements.prepend(announcement);
                 setTimeout(() => announcement.style.opacity = 1, 100);
+				lastLog = log.ID;
             });
         }
     </script>
