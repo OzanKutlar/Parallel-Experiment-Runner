@@ -27,18 +27,21 @@
             gap: 10px;
         }
 		.red-box {
-            width: 100px;
-            height: 100px;
-            background-color: red;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 20px;
-            flex-direction: column;
-            border-radius: 15px; /* Rounded corners */
-            cursor: pointer; /* Indicate that the box is clickable */
-        }
+			width: 100px;
+			height: 100px;
+			background-color: red;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: white;
+			font-size: 20px;
+			flex-direction: column;
+			border-radius: 15px; /* Rounded corners */
+			cursor: pointer; /* Indicate that the box is clickable */
+			text-align: center; /* Center the text horizontally */
+			word-wrap: break-word; /* Allow text to wrap within the box */
+			white-space: normal; /* Ensure the text can wrap */
+		}
         .right {
             width: 12.5%; /* 1/8th of the screen */
             position: fixed;

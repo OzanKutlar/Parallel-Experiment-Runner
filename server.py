@@ -89,7 +89,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             return
 
         
-        computer_name = self.headers.get('ComputerName', '%ComputerName%')
+        computer_name = self.headers.get('ComputerName', 'Admin')
         
         ID = self.headers.get('ID', '-1')
         
