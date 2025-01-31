@@ -365,7 +365,7 @@ if __name__ == "__main__":
     
     if not should_load:
         print("No parameters. No experiments.");
-        return
+        exit()
     with open(data_file, "r") as f:
         code = f.read()  # Read the script content
 
