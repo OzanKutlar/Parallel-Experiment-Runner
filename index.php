@@ -74,7 +74,7 @@
     <div class="container">
         <div class="left">
             <?php for ($i = 1; $i <= $numBoxes; $i++): ?>
-                <div class="red-box" onclick="redbox(<?php echo $i; ?>)">
+                <div class="red-box" id="box-<?php echo $i; ?>" onclick="redbox(<?php echo $i; ?>)">
                     <div>Box <?php echo $i; ?></div>
                 </div>
             <?php endfor; ?>
@@ -136,15 +136,12 @@
         }
 		
 		function changeBox(boxNumber) {
-			// Get the specific box by using the box number to find the right element
-			var box = document.querySelectorAll('.red-box')[boxNumber - 1]; 
+			var box = document.getElementById('box-' + number);
 
-			// Change the text inside the box to 'Given'
 			box.querySelector('div').textContent = 'Given';
 
-			// Add a class to initiate the color transition
-			box.style.transition = 'background-color 1s ease'; // Smooth transition for color change
-			box.style.backgroundColor = 'green'; // Change the box color to green
+			box.style.transition = 'background-color 1s ease';
+			box.style.backgroundColor = 'green';
 		}
 
 		
