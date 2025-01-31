@@ -59,7 +59,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         
         if self.path == "/logs":
             last_log = int(self.headers.get('lastLog', len(logs) - 6))
-            print(f"Request came for a log with lastlog : {last_log}")
+            # print(f"Request came for a log with lastlog : {last_log}")
             if(last_log <= len(logs) - 6):
                 relevant_logs = logs[-5:]
             else:
@@ -73,7 +73,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             
         if self.path == "/status":
             last_log = int(self.headers.get('lastLog', len(logs) - 6))
-            print(f"Sending state from : {last_log}")
+            # print(f"Sending state from : {last_log}")
             relevant_logs = stateLogs[last_log+1:]
             
             self.send_response(200)
