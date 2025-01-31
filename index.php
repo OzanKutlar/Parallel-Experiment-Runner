@@ -81,37 +81,43 @@
         <div class="right">
             <h3>Log</h3>
             <div id="announcements"></div>
-            <button onclick="addAnnouncement()">Add Announcement</button>
+            <button onclick="fetchLogs()">Add Announcement</button>
         </div>
     </div>
     
     <script>
-        function addAnnouncement() {
-			const serverUrl = `${window.location.protocol}//${window.location.hostname}:3753/logs`;
+        function fetchLogs() {
+            const serverUrl = `${window.location.protocol}//${window.location.hostname}:3753/logs`;
 
             fetch(serverUrl, {
                 method: 'GET',
                 headers: {
-                    'lastLog': '0'  // You can dynamically set this if needed
+                    'lastLog': '0'  // Can be dynamically set if needed
                 }
             })
             .then(response => response.json())
             .then(data => {
                 console.log("Logs received:", data);
-                document.getElementById("logOutput").textContent = JSON.stringify(data, null, 2);
+                addAnnouncements(data); // Process and add logs
             })
             .catch(error => console.error("Error fetching logs:", error));
+        }
+
+        function addAnnouncements(logs) {
             let announcements = document.getElementById("announcements");
-            let announcement = document.createElement("div");
-            announcement.classList.add("announcement");
-            announcement.innerHTML = "New announcement at " + new Date().toLocaleTimeString();
-            
-            if (announcements.children.length >= 5) {
-                announcements.removeChild(announcements.lastChild);
-            }
-            
-            announcements.prepend(announcement);
-            setTimeout(() => announcement.style.opacity = 1, 100);
+
+            logs.forEach(log => {
+                let announcement = document.createElement("div");
+                announcement.classList.add("announcement");
+                announcement.innerHTML = `<strong>ID:</strong> ${log.ID} <br> <strong>Message:</strong> ${log.Text}`;
+
+                if (announcements.children.length >= 5) {
+                    announcements.removeChild(announcements.lastChild);
+                }
+
+                announcements.prepend(announcement);
+                setTimeout(() => announcement.style.opacity = 1, 100);
+            });
         }
     </script>
 </body>
