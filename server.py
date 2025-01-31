@@ -358,6 +358,7 @@ if __name__ == "__main__":
                         data_file = py_files[choice - 1]
                         should_load = input(f"Do you want to load data from {data_file}? (Y/n): ").strip().lower()
                         should_load = should_load in ("", "yes", "y")
+                        break
                     else:
                         print("Invalid selection.")
                 except ValueError:

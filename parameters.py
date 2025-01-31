@@ -8,7 +8,7 @@ shared_params = {
 
 shared_params2 = {
     "task":["firstTask", "secondTask", "thirdTask"],
-    "pop": [500],
+    "pop": [[500, 200], [200, 300]],
     "runs": [20],
     "generation": [350]
 }
