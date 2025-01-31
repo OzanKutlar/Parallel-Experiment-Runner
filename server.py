@@ -99,7 +99,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             if(not completed_array[int(ID) - 1]):
                 stateLog("Reset", int(ID))
                 print(f"Resetting data {int(ID) + 1} for {computer_name} due to new request.")
-                log(f"Reset on index : {int(ID) + 1} ({computer_name})")
+                log(f"Reset index {int(ID) + 1} by {computer_name}")
                 data_index.append(int(ID))
                 givenToPC[prev_index] = 'Reset'
                 completed_array[prev_index] = False
@@ -405,7 +405,7 @@ if __name__ == "__main__":
                     if 0 <= index < len(givenToPC):
                         # print(json.dumps(data_array[index], indent=2))
                         stateLog("Reset", index+1)
-                        log(f"Reset on index : {index+1} (User)")
+                        log(f"Reset index {index+1} from terminal.")
                         data_index.append(index)
                         givenToPC[index] = 'Reset'
                         completed_array[index] = False

@@ -198,7 +198,7 @@
                 announcement.classList.add("announcement");
                 announcement.innerHTML = `${log.Text} <br> ${log.time}`;
 
-                if (announcements.children.length >= 5) {
+                if (announcements.children.length >= 30) {
                     announcements.removeChild(announcements.lastChild);
                 }
                 announcements.prepend(announcement);
