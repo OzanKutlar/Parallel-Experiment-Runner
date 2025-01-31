@@ -87,7 +87,7 @@
     
     <script>
         function fetchLogs() {
-            const serverUrl = `${window.location.protocol}//${window.location.hostname}:3753/logs`;
+            const serverUrl = `${window.location.hostname}:3753/logs`;
 
             fetch(serverUrl, {
                 method: 'GET',

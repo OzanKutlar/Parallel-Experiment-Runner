@@ -45,7 +45,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         
         if self.path == "/logs":
             # Get 'lastLog' from headers or default to 0
-            last_log = int(self.headers.get('lastLog', 0))  # Default to 0 if not provided
+            last_log = int(self.headers.get('lastLog', len(logs) - 6))  # Default to 0 if not provided
             # Get logs after the 'lastLog' index
             relevant_logs = logs[last_log:last_log+5]  # Get 5 logs after the 'lastLog' index
             # Send response in JSON format
