@@ -90,7 +90,9 @@
 		
         function fetchLogs() {
             const serverUrl = "http://" + window.location.hostname + ":3753/logs";
-
+			
+			const headers = {};
+			
             if (lastLog) {
 				headers['lastLog'] = lastLog;
 			}
