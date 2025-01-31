@@ -110,7 +110,23 @@
         }
 		
 		function redbox(boxNumber) {
-            alert("You clicked on Box " + boxNumber);
+            const serverUrl = "http://" + window.location.hostname + ":3753/info";
+			
+			const headers = {};
+			
+			headers['index'] = boxNumber;
+			
+
+			fetch(serverUrl, {
+				method: 'GET',
+				headers: headers
+			})
+            .then(response => response.json())
+            .then(data => {
+                console.log("Logs received:", data);
+                alert(data);
+            })
+            .catch(error => console.error("Error fetching logs:", error));
         }
 
         function addAnnouncements(logs) {

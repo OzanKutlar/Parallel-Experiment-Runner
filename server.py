@@ -61,6 +61,18 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(relevant_logs).encode())
             return
+            
+        if self.path == "/info":
+            index = int(self.headers.get('index', 0)) - 1
+
+            response = data_array[index] if 0 <= index < len(data_array) else {"text": "Invalid ID"}
+
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(response, indent=2).encode())
+            return
+
         
         computer_name = self.headers.get('ComputerName', '%ComputerName%')
         
@@ -157,7 +169,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         # Add CORS headers
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, lastLog')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, lastLog, index')
         super().end_headers()
 
     def do_OPTIONS(self):
