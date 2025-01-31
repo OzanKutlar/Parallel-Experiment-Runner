@@ -125,15 +125,15 @@
             .then(data => {
 				console.log("Logs received:", data);
 
-				localStorage.setItem("data", JSON.stringify(data));
-
 				const width = 600;
 				const height = 400;
-				
+
 				const left = (window.innerWidth / 2) - (width / 2);
 				const top = (window.innerHeight / 2) - (height / 2);
 				
-				window.open("boxInfo.php", "_blank", `width=${width},height=${height},left=${left},top=${top}`);
+				const encodedData = encodeURIComponent(JSON.stringify(data));
+				
+				window.open("boxInfo.php?data=" + encodedData, "_blank", `width=${width},height=${height},left=${left},top=${top}`);
 			})
             .catch(error => console.error("Error fetching logs:", error));
         }
