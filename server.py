@@ -89,25 +89,43 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(response, indent=2).encode())
             return
+            
+        if self.path == "/reset":
+            index = int(self.headers.get('index', 0)) - 1
+
+            response = {"text": "Reset Success"} if 0 <= index < len(data_array) else {"text": "Invalid ID"}
+            
+            stateLog("Reset", index)
+            print(f"Resetting data {index + 1} because of webpage.")
+            log(f"Reset index {index + 1} from webpage")
+            data_index.append(index)
+            givenToPC[index] = 'Reset'
+            completed_array[index] = False
+            
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(response, indent=2).encode())
+            return
 
         
         computer_name = self.headers.get('ComputerName', 'Admin')
         
         ID = self.headers.get('ID', '-1')
         
+        last = data_index.pop()
+        
+        if not data_index:
+            data_index.append(last + 1)
         if(ID != '-1'):
             if(not completed_array[int(ID) - 1]):
                 stateLog("Reset", int(ID))
                 print(f"Resetting data {int(ID) + 1} for {computer_name} due to new request.")
                 log(f"Reset index {int(ID) + 1} by {computer_name}")
                 data_index.append(int(ID))
-                givenToPC[prev_index] = 'Reset'
-                completed_array[prev_index] = False
-        
-        last = data_index.pop()
-        
-        if not data_index:
-            data_index.append(last + 1)
+                givenToPC[int(ID)] = 'Reset'
+                completed_array[int(ID)] = False
+                
         if last < len(data_array):
             response_data = data_array[last]
             if last == len(givenToPC):
