@@ -114,6 +114,7 @@
 			
 			headers['lastLog'] = lastState;
 			
+			serverUrl = "http://" + window.location.hostname + ":3753/status";
 
 			fetch(serverUrl, {
 				method: 'GET',
@@ -182,7 +183,7 @@
             logs.forEach(log => {
                 let announcement = document.createElement("div");
                 announcement.classList.add("announcement");
-                announcement.innerHTML = "<strong>ID:</strong> ${log.ID} <br> <strong>Message:</strong> ${log.Text}";
+                announcement.innerHTML = `<strong>ID:</strong> ${log.ID} <br> <strong>Message:</strong> ${log.Text}`;
 
                 if (announcements.children.length >= 5) {
                     announcements.removeChild(announcements.lastChild);
