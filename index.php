@@ -34,7 +34,7 @@
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 15px;
+            font-size: 20px;
             flex-direction: column;
             border-radius: 15px; /* Rounded corners */
             cursor: pointer; /* Indicate that the box is clickable */
@@ -143,17 +143,17 @@
 			box.style.transition = 'background-color 1s ease';
 			let textToPut = '';
 			if (state.state === "Finished") {
-				textToPut = `<div>${state.index} Finished by ${state.sentTo}</div>`;
+				textToPut = `${state.index} Finished by ${state.sentTo}`;
 				box.style.backgroundColor = 'green';
 			} else if (state.state === "Running") {
-				textToPut = `<div>${state.index} Running on ${state.sentTo}</div>`;
+				textToPut = `${state.index} Running on ${state.sentTo}`;
 				box.style.backgroundColor = 'purple';
 			} else if (state.state === "Reset") {
-				textToPut = `<div>${state.index} is Waiting</div>`;
+				textToPut = `${state.index} is Waiting`;
 				box.style.backgroundColor = 'red';
 			}
 
-			box.querySelector('div').innerHTML = textToPut;
+			box.querySelector('div').textContent  = textToPut;
 
 		}
 
