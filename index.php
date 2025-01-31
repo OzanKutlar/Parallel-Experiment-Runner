@@ -140,7 +140,7 @@
         }
 		
 		function changeBox(state) {
-			let boxNumber = state.index + 1
+			let boxNumber = state.index
 			var box = document.getElementById('box-' + boxNumber);
 			
 			box.style.transition = 'background-color 1s ease';
