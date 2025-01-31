@@ -130,6 +130,7 @@
 		
 		function changeStates(states) {
             states.forEach(state => {
+				console.log("Checking ID " + state.index)
 				changeBox(state.index)
 				lastState = state.ID;
             });
