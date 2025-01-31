@@ -130,8 +130,7 @@
 
 				// Open a new window and pass the data in the query string
 				window.open("boxInfo.php?data=" + encodedData, "_blank");
-			});
-
+			})
             .catch(error => console.error("Error fetching logs:", error));
         }
 
