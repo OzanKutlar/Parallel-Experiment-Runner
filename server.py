@@ -17,6 +17,8 @@ givenToPC = []
 
 data_index = []
 
+logs = []
+
 RED = "\033[31m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
@@ -28,6 +30,9 @@ RESET = "\033[0m"
 
 ROWS_PER_COLUMN = 20  # Number of rows that fit into a single terminal column
 COLUMN_DIST = 30
+
+def log(text):
+    logs.append({"Text": text, "ID": len(logs)})
 
 class MyRequestHandler(BaseHTTPRequestHandler):
     global data_index
@@ -62,6 +67,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         if(ID != '-1'):
             if(not completed_array[int(ID) - 1]):
                 print(f"Resetting data {prev_index + 1} for {computer_name} due to new request.")
+                log(f"Reset on index : {prev_index + 1} ({computer_name})")
                 data_index.append(prev_index)
                 givenToPC[prev_index] = 'Reset'
                 completed_array[prev_index] = False
@@ -284,6 +290,7 @@ def display_colored_array(data_array):
     print("Enter command (type 'quit' to stop): ")
    
 def start_server(server):
+    log("Server Started")
     print(f"Server running on {server.server_address[0]}:{server.server_address[1]}")
     server.serve_forever()
 
@@ -347,6 +354,7 @@ if __name__ == "__main__":
                     index = int(user_input.split()[1]) - 1
                     if 0 <= index < len(givenToPC):
                         # print(json.dumps(data_array[index], indent=2))
+                        log("Reset on index : " + index + " (User)")
                         data_index.append(index)
                         givenToPC[index] = 'Reset'
                         completed_array[index] = False
