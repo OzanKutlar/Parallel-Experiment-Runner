@@ -95,7 +95,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
             response = {"text": "Reset Success"} if 0 <= index < len(data_array) else {"text": "Invalid ID"}
             
-            stateLog("Reset", index)
+            stateLog("Reset", index+1)
             print(f"Resetting data {index + 1} because of webpage.")
             log(f"Reset index {index + 1} from webpage")
             data_index.append(index)
