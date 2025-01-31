@@ -118,11 +118,11 @@ class MyRequestHandler(BaseHTTPRequestHandler):
                 completed_array[last] = False
             stateLog("Running", last + 1, computer_name)
             display_colored_array(data_array)
-            log(f"Sent Data on index : {last + 1} ({computer_name})")
+            log(f"Sent Data on index {last + 1} to {computer_name}")
             print(f"Data {last+1} has been sent to {computer_name}")
         else:
             response_data = {"message": "No more data left."}
-            log(f"Shutting down ({computer_name})")
+            log(f"Shutting down {computer_name}")
             print(f'Data Distribution is finished. Extra connections : ', (last - len(data_array)))
         
         response_json = json.dumps(response_data)

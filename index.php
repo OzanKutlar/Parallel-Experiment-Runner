@@ -78,7 +78,7 @@
         <div class="left">
             <?php for ($i = 1; $i <= $numBoxes; $i++): ?>
                 <div class="red-box" id="box-<?php echo $i; ?>" onclick="redbox(<?php echo $i; ?>)">
-                    <div>Box <?php echo $i; ?></div>
+                    <div><?php echo $i; ?> is Waiting</div>
                 </div>
             <?php endfor; ?>
         </div>
