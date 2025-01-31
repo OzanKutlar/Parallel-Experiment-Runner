@@ -121,7 +121,6 @@
 				method: 'GET',
 				headers: headers
 			})
-            .then(response => response.json())
             .then(data => {
                 console.log("Logs received:", data);
                 alert(data);
