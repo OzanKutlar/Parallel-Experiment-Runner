@@ -226,7 +226,7 @@
 		
 		window.onload = function() {
             fetchAll()
-			setInterval(fetchAll, 1000);
+			setInterval(fetchAll, 2000);
         }
     </script>
 </body>

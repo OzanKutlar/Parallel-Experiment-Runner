@@ -43,6 +43,9 @@ def stateLog(newState, index, sentTo="Null"):
 class MyRequestHandler(BaseHTTPRequestHandler):
     global data_index
     
+    def log_message(self, format, *args):
+        pass
+    
     def do_GET(self):
         global data_index
         
