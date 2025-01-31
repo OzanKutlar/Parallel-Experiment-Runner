@@ -87,6 +87,20 @@
     
     <script>
         function addAnnouncement() {
+			const serverUrl = `${window.location.protocol}//${window.location.hostname}:3753/logs`;
+
+            fetch(serverUrl, {
+                method: 'GET',
+                headers: {
+                    'lastLog': '0'  // You can dynamically set this if needed
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Logs received:", data);
+                document.getElementById("logOutput").textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => console.error("Error fetching logs:", error));
             let announcements = document.getElementById("announcements");
             let announcement = document.createElement("div");
             announcement.classList.add("announcement");

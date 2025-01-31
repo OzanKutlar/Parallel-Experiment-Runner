@@ -43,6 +43,19 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(str(len(data_array)).encode())
             return
         
+        if self.path == "/logs":
+            # Get 'lastLog' from headers or default to 0
+            last_log = int(self.headers.get('lastLog', 0))  # Default to 0 if not provided
+            # Get logs after the 'lastLog' index
+            relevant_logs = logs[last_log:last_log+5]  # Get 5 logs after the 'lastLog' index
+            # Send response in JSON format
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            # Send logs as JSON
+            self.wfile.write(json.dumps(relevant_logs).encode())
+            return
+        
         computer_name = self.headers.get('ComputerName', '%ComputerName%')
         
         ID = self.headers.get('ID', '-1')
