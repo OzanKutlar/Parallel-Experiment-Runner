@@ -402,7 +402,7 @@ if __name__ == "__main__":
                     index = int(user_input.split()[1]) - 1
                     if 0 <= index < len(givenToPC):
                         # print(json.dumps(data_array[index], indent=2))
-                        stateLog("Reset", int(ID))
+                        stateLog("Reset", index)
                         log(f"Reset on index : {index+1} (User)")
                         data_index.append(index)
                         givenToPC[index] = 'Reset'
