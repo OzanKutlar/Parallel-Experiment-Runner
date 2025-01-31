@@ -93,6 +93,10 @@
 		let lastLog = -1;
 		let lastState = -1;
 		
+		setInterval(fetchAll, 1000);
+
+		fetchAll();
+		
 		function fetchAll() {
 			fetchLogs()
 			fetchStates()
