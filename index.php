@@ -140,18 +140,21 @@
 			let boxNumber = state.index + 1
 			var box = document.getElementById('box-' + boxNumber);
 			
-			const textToPut = `<div><strong>ID</strong>: ${state.index}</div><div><strong>State</strong>: ${state.state}</div><div><strong>PC</strong>: ${state.sentTo}</div>`;
-			
-			box.querySelector('div').innerHTML = textToPut;
-
 			box.style.transition = 'background-color 1s ease';
+			let textToPut = '';
 			if (state.state === "Finished") {
+				textToPut = `<div><strong>ID</strong>: ${state.index}</div><div><strong>State</strong>: ${state.state}</div><div><strong>PC</strong>: ${state.sentTo}</div><div>${state.index} Finished by ${state.sentTo}</div>`;
 				box.style.backgroundColor = 'green';
 			} else if (state.state === "Running") {
+				textToPut = `<div><strong>ID</strong>: ${state.index}</div><div><strong>State</strong>: ${state.state}</div><div><strong>PC</strong>: ${state.sentTo}</div><div>${state.index} Running on ${state.sentTo}</div>`;
 				box.style.backgroundColor = 'purple';
 			} else if (state.state === "Reset") {
+				textToPut = `<div><strong>ID</strong>: ${state.index}</div><div><strong>State</strong>: ${state.state}</div><div><strong>PC</strong>: ${state.sentTo}</div><div>${state.index} is Waiting</div>`;
 				box.style.backgroundColor = 'red';
 			}
+
+			box.querySelector('div').innerHTML = textToPut;
+
 		}
 
 		
