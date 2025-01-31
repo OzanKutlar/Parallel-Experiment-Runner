@@ -368,7 +368,7 @@ if __name__ == "__main__":
                     index = int(user_input.split()[1]) - 1
                     if 0 <= index < len(givenToPC):
                         # print(json.dumps(data_array[index], indent=2))
-                        log("Reset on index : " + index + " (User)")
+                        log(f"Reset on index : {index+1} (User)")
                         data_index.append(index)
                         givenToPC[index] = 'Reset'
                         completed_array[index] = False
