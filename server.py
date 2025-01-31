@@ -18,6 +18,7 @@ givenToPC = []
 data_index = []
 
 logs = []
+stateLogs = []
 
 RED = "\033[31m"
 GREEN = "\033[32m"
@@ -33,6 +34,9 @@ COLUMN_DIST = 30
 
 def log(text):
     logs.append({"Text": text, "ID": len(logs)})
+    
+def stateLog(newState, index, sentTo="Null"):
+    stateLogs.append({"state": newState, "index": index, "ID": len(stateLogs), "sentTo": sentTo})
 
 class MyRequestHandler(BaseHTTPRequestHandler):
     global data_index
@@ -62,6 +66,17 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(relevant_logs).encode())
             return
             
+        if self.path == "/status":
+            last_log = int(self.headers.get('lastLog', len(logs) - 6))
+            print(f"Sending state from : {last_log}")
+            relevant_logs = stateLogs[last_log+1:]
+            
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(relevant_logs).encode())
+            return
+            
         if self.path == "/info":
             index = int(self.headers.get('index', 0)) - 1
 
@@ -77,15 +92,18 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         computer_name = self.headers.get('ComputerName', '%ComputerName%')
         
         ID = self.headers.get('ID', '-1')
+        
         if(ID != '-1'):
             if(not completed_array[int(ID) - 1]):
-                print(f"Resetting data {prev_index + 1} for {computer_name} due to new request.")
-                log(f"Reset on index : {prev_index + 1} ({computer_name})")
-                data_index.append(prev_index)
+                stateLog("Reset", int(ID))
+                print(f"Resetting data {int(ID) + 1} for {computer_name} due to new request.")
+                log(f"Reset on index : {int(ID) + 1} ({computer_name})")
+                data_index.append(int(ID))
                 givenToPC[prev_index] = 'Reset'
                 completed_array[prev_index] = False
         
         last = data_index.pop()
+        
         if not data_index:
             data_index.append(last + 1)
         if last < len(data_array):
@@ -98,6 +116,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
                 completed_array.append(False)
             else:
                 completed_array[last] = False
+            stateLog("Sent", int(ID), computer_name)
             display_colored_array(data_array)
             log(f"Sent Data on index : {last + 1} ({computer_name})")
             print(f"Data {last+1} has been sent to {computer_name}")
@@ -117,6 +136,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             ID = self.headers.get('ID', '-1')
             if(ID != '-1'):
                 log(f"Recieved Data : {ID}")
+                stateLog("Finished", int(ID))
                 print("ID " + ID + " is finished.")
                 completed_array[int(ID) - 1] = True
                 
@@ -328,6 +348,7 @@ if __name__ == "__main__":
         if(data_index[-1] < 0):
             data_index[-1] = 0
         for i in range(data_index[-1]):
+            stateLog("Finished", i)
             givenToPC.append("PRE")
             completed_array.append(True)
     else:

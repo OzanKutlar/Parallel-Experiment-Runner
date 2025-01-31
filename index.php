@@ -88,6 +88,7 @@
     
     <script>
 		let lastLog = -1; // Initialize lastLog variable
+		let lastState = -1; // Initialize lastLog variable
 		
         function fetchLogs() {
             const serverUrl = "http://" + window.location.hostname + ":3753/logs";
@@ -107,7 +108,44 @@
                 addAnnouncements(data); // Process and add logs
             })
             .catch(error => console.error("Error fetching logs:", error));
+			
+			
+			// States of the red boxes.
+			
+			headers['lastLog'] = lastState;
+			
+
+			fetch(serverUrl, {
+				method: 'GET',
+				headers: headers
+			})
+            .then(response => response.json())
+            .then(data => {
+                console.log("States received:", data);
+                changeStates(data); // Process and add logs
+            })
+            .catch(error => console.error("Error fetching logs:", error));
         }
+		
+		function changeStates(states) {
+            states.forEach(log => {
+				changeBox(log.ID)
+				lastState = log.ID;
+            });
+        }
+		
+		function changeBox(boxNumber) {
+			// Get the specific box by using the box number to find the right element
+			var box = document.querySelectorAll('.red-box')[boxNumber - 1]; 
+
+			// Change the text inside the box to 'Given'
+			box.querySelector('div').textContent = 'Given';
+
+			// Add a class to initiate the color transition
+			box.style.transition = 'background-color 1s ease'; // Smooth transition for color change
+			box.style.backgroundColor = 'green'; // Change the box color to green
+		}
+
 		
 		function redbox(boxNumber) {
             const serverUrl = "http://" + window.location.hostname + ":3753/info";
@@ -144,17 +182,18 @@
             logs.forEach(log => {
                 let announcement = document.createElement("div");
                 announcement.classList.add("announcement");
-                announcement.innerHTML = `<strong>ID:</strong> ${log.ID} <br> <strong>Message:</strong> ${log.Text}`;
+                announcement.innerHTML = "<strong>ID:</strong> ${log.ID} <br> <strong>Message:</strong> ${log.Text}";
 
                 if (announcements.children.length >= 5) {
                     announcements.removeChild(announcements.lastChild);
                 }
-
                 announcements.prepend(announcement);
                 setTimeout(() => announcement.style.opacity = 1, 100);
 				lastLog = log.ID;
             });
         }
+		
+		
     </script>
 </body>
 </html>
