@@ -85,7 +85,7 @@
         <div class="right">
             <h3>Log</h3>
             <div id="announcements"></div>
-            <button onclick="fetchAll()">Fetch All</button>
+            <button onclick="startFetchAll()">Fetch All</button>
         </div>
     </div>
     
@@ -93,9 +93,11 @@
 		let lastLog = -1;
 		let lastState = -1;
 		
-		setInterval(fetchAll, 1000);
 
-		fetchAll();
+		function startFetchAll(){
+			fetchAll()
+			setInterval(fetchAll, 1000);
+		}
 		
 		function fetchAll() {
 			fetchLogs()
