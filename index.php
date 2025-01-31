@@ -146,13 +146,13 @@
 			box.style.transition = 'background-color 1s ease';
 			let textToPut = '';
 			if (state.state === "Finished") {
-				textToPut = `${state.index} Finished by ${state.sentTo}`;
+				textToPut = `${boxNumber} Finished by ${state.sentTo}`;
 				box.style.backgroundColor = 'green';
 			} else if (state.state === "Running") {
-				textToPut = `${state.index} Running on ${state.sentTo}`;
+				textToPut = `${boxNumber} Running on ${state.sentTo}`;
 				box.style.backgroundColor = 'purple';
 			} else if (state.state === "Reset") {
-				textToPut = `${state.index} is Waiting`;
+				textToPut = `${boxNumber} is Waiting`;
 				box.style.backgroundColor = 'red';
 			}
 
@@ -196,7 +196,7 @@
             logs.forEach(log => {
                 let announcement = document.createElement("div");
                 announcement.classList.add("announcement");
-                announcement.innerHTML = `<strong>ID:</strong> ${log.ID} <br> <strong>Message:</strong> ${log.Text}`;
+                announcement.innerHTML = `${log.Text} <br> ${log.time}`;
 
                 if (announcements.children.length >= 5) {
                     announcements.removeChild(announcements.lastChild);

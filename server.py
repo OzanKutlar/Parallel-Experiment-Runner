@@ -33,7 +33,9 @@ ROWS_PER_COLUMN = 20  # Number of rows that fit into a single terminal column
 COLUMN_DIST = 30
 
 def log(text):
-    logs.append({"Text": text, "ID": len(logs)})
+    current_time = time.strftime('%Y-%m-%d %H:%M:%S')
+    logs.append({"Text": text, "ID": len(logs), "Timestamp": current_time})
+
     
 def stateLog(newState, index, sentTo="Null"):
     stateLogs.append({"state": newState, "index": index, "ID": len(stateLogs), "sentTo": sentTo})
