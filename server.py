@@ -152,6 +152,17 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"File uploaded and saved successfully")
 
+    def end_headers(self):
+        # Add CORS headers
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        # Handle preflight requests for CORS
+        self.send_response(200)
+        self.end_headers()
 
 
 # ChatGPT generated this. When an input object with arrays for parameters is given in,
