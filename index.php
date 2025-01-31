@@ -93,9 +93,8 @@
 			
 			const headers = {};
 			
-            if (lastLog) {
-				headers['lastLog'] = lastLog;
-			}
+			headers['lastLog'] = lastLog;
+			
 
 			fetch(serverUrl, {
 				method: 'GET',
