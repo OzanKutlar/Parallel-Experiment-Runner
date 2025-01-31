@@ -85,16 +85,21 @@
         <div class="right">
             <h3>Log</h3>
             <div id="announcements"></div>
-            <button onclick="fetchLogs()">Add Announcement</button>
+            <button onclick="fetchAll()">Fetch All</button>
         </div>
     </div>
     
     <script>
-		let lastLog = -1; // Initialize lastLog variable
-		let lastState = -1; // Initialize lastLog variable
+		let lastLog = -1;
+		let lastState = -1;
+		
+		function fetchAll() {
+			fetchLogs()
+			fetchStates()
+		}
 		
         function fetchLogs() {
-            let serverUrl = "http://" + window.location.hostname + ":3753/logs";
+            const serverUrl = "http://" + window.location.hostname + ":3753/logs";
 			
 			const headers = {};
 			
@@ -108,16 +113,19 @@
             .then(response => response.json())
             .then(data => {
                 console.log("Logs received:", data);
-                addAnnouncements(data); // Process and add logs
+                addAnnouncements(data);
             })
             .catch(error => console.error("Error fetching logs:", error));
 			
+        }
+		
+		function fetchStates(){
 			
-			// States of the red boxes.
+			const serverUrl = "http://" + window.location.hostname + ":3753/status";
+			const headers = {};
 			
 			headers['lastLog'] = lastState;
 			
-			serverUrl = "http://" + window.location.hostname + ":3753/status";
 
 			fetch(serverUrl, {
 				method: 'GET',
@@ -126,10 +134,10 @@
             .then(response => response.json())
             .then(data => {
                 console.log("States received:", data);
-                changeStates(data); // Process and add logs
+                changeStates(data);
             })
             .catch(error => console.error("Error fetching logs:", error));
-        }
+		}
 		
 		function changeStates(states) {
             states.forEach(state => {
@@ -185,7 +193,15 @@
 				
 				const encodedData = encodeURIComponent(JSON.stringify(data));
 				
-				window.open("boxInfo.php?data=" + encodedData, "_blank", `width=${width},height=${height},left=${left},top=${top}`);
+				const newWindow = window.open("boxInfo.php?data=" + encodedData, "_blank", `width=${width},height=${height},left=${left},top=${top}`);
+				
+				const interval = setInterval(() => {
+					if (newWindow.closed) {
+						fetchStates()
+						clearInterval(interval);
+					}
+				}, 100);
+				
 			})
             .catch(error => console.error("Error fetching logs:", error));
         }
