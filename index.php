@@ -140,7 +140,7 @@
 			let boxNumber = state.index + 1
 			var box = document.getElementById('box-' + boxNumber);
 			
-			const textToPut = `<strong>ID</strong>: ${state.index}<br><strong>State</strong>: ${state.state}<br><strong>PC</strong>: ${state.sentTo}`;
+			const textToPut = `<div><strong>ID</strong>: ${state.index}<br><strong>State</strong>: ${state.state}<br><strong>PC</strong>: ${state.sentTo}</div>`;
 			
 			box.querySelector('div').innerHTML = textToPut;
 
