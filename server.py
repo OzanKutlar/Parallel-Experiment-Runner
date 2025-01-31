@@ -86,9 +86,11 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             else:
                 completed_array[last] = False
             display_colored_array(data_array)
+            log(f"Sent Data on index : {last + 1} ({computer_name})")
             print(f"Data {last+1} has been sent to {computer_name}")
         else:
             response_data = {"message": "No more data left."}
+            log(f"Shutting down ({computer_name})")
             print(f'Data Distribution is finished. Extra connections : ', (last - len(data_array)))
         
         response_json = json.dumps(response_data)
@@ -101,6 +103,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         # try:
             ID = self.headers.get('ID', '-1')
             if(ID != '-1'):
+                log(f"Recieved Data : {ID}")
                 print("ID " + ID + " is finished.")
                 completed_array[int(ID) - 1] = True
                 
