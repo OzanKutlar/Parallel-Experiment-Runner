@@ -86,7 +86,7 @@
     </div>
     
     <script>
-		let lastLog = null; // Initialize lastLog variable
+		let lastLog = -1; // Initialize lastLog variable
 		
         function fetchLogs() {
             const serverUrl = "http://" + window.location.hostname + ":3753/logs";
