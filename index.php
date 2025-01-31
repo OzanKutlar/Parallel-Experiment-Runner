@@ -131,18 +131,27 @@
 		function changeStates(states) {
             states.forEach(state => {
 				console.log("Checking ID " + state.index)
-				changeBox(state.index + 1)
+				changeBox(state)
 				lastState = state.ID;
             });
         }
 		
-		function changeBox(boxNumber) {
+		function changeBox(state) {
+			let boxNumber = state.index + 1
 			var box = document.getElementById('box-' + boxNumber);
-
-			box.querySelector('div').textContent = 'Given';
+			
+			const textToPut = `<strong>ID</strong>: ${state.index}<br><strong>State</strong>: ${state.state}<br><strong>PC</strong>: ${state.sentTo}`;
+			
+			box.querySelector('div').textContent = textToPut;
 
 			box.style.transition = 'background-color 1s ease';
-			box.style.backgroundColor = 'green';
+			if (state.state === "Finished") {
+				box.style.backgroundColor = 'green';
+			} else if (state.state === "Running") {
+				box.style.backgroundColor = 'purple';
+			} else if (state.state === "Reset") {
+				box.style.backgroundColor = 'red';
+			}
 		}
 
 		

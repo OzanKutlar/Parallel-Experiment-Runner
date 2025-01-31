@@ -116,7 +116,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
                 completed_array.append(False)
             else:
                 completed_array[last] = False
-            stateLog("Sent", int(ID), computer_name)
+            stateLog("Running", int(ID), computer_name)
             display_colored_array(data_array)
             log(f"Sent Data on index : {last + 1} ({computer_name})")
             print(f"Data {last+1} has been sent to {computer_name}")
