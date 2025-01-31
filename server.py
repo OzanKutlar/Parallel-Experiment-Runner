@@ -348,7 +348,7 @@ if __name__ == "__main__":
         if(data_index[-1] < 0):
             data_index[-1] = 0
         for i in range(data_index[-1]):
-            stateLog("Finished", i)
+            stateLog("Finished", i, "PRE")
             givenToPC.append("PRE")
             completed_array.append(True)
     else:
@@ -402,6 +402,7 @@ if __name__ == "__main__":
                     index = int(user_input.split()[1]) - 1
                     if 0 <= index < len(givenToPC):
                         # print(json.dumps(data_array[index], indent=2))
+                        stateLog("Reset", int(ID))
                         log(f"Reset on index : {index+1} (User)")
                         data_index.append(index)
                         givenToPC[index] = 'Reset'
