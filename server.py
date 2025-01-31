@@ -34,7 +34,7 @@ COLUMN_DIST = 30
 
 def log(text):
     current_time = time.strftime('%Y-%m-%d %H:%M:%S')
-    logs.append({"Text": text, "ID": len(logs), "Timestamp": current_time})
+    logs.append({"Text": text, "ID": len(logs), "time": current_time})
 
     
 def stateLog(newState, index, sentTo="Null"):
