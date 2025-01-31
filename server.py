@@ -349,7 +349,7 @@ if __name__ == "__main__":
         data_index.append(int(sys.argv[1]) - 1)
         if(data_index[-1] < 0):
             data_index[-1] = 0
-        for i in range(1,data_index[-1]):
+        for i in range(1,data_index[-1] + 1):
             stateLog("Finished", i, "PRE")
             givenToPC.append("PRE")
             completed_array.append(True)
