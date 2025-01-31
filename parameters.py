@@ -8,7 +8,7 @@ shared_params = {
 
 shared_params2 = {
     "task":["firstTask", "secondTask", "thirdTask"],
-    "pop": [[500, 200], [200, 300]],
+    "pop": [500],
     "runs": [20],
     "generation": [350]
 }
@@ -52,4 +52,14 @@ data_one, id_counter = generate_combined_data(
     bbbc_params
 )
 
+# data_two, id_counter = generate_combined_data(
+    # shared_params2,
+    # id_counter,
+    # ga_params,
+    # de_params,
+    # pso_params,
+    # bbbc_params
+# )
+
+# data_array = data_one + data_two
 data_array = data_one
