@@ -129,9 +129,9 @@
         }
 		
 		function changeStates(states) {
-            states.forEach(log => {
-				changeBox(log.ID)
-				lastState = log.ID + 1;
+            states.forEach(state => {
+				changeBox(state.index)
+				lastState = state.ID;
             });
         }
 		
