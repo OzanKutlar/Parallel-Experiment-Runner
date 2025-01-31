@@ -51,7 +51,10 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/logs":
             last_log = int(self.headers.get('lastLog', len(logs) - 6))
             print(f"Request came for a log with lastlog : {last_log}")
-            relevant_logs = logs[last_log+1:last_log+5]
+            if(last_log <= len(logs - 6)):
+                relevant_logs = logs[-5:]
+            else:
+                relevant_logs = logs[last_log+1:last_log+5]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json")
