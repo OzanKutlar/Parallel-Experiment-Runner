@@ -123,9 +123,15 @@
 			})
             .then(response => response.json())
             .then(data => {
-                console.log("Logs received:", data);
-                alert(JSON.stringify(data, null, 2));
-            })
+				console.log("Logs received:", data);
+
+				// Encode the data to pass in the URL
+				const encodedData = encodeURIComponent(JSON.stringify(data));
+
+				// Open a new window and pass the data in the query string
+				window.open("boxInfo.php?data=" + encodedData, "_blank");
+			});
+
             .catch(error => console.error("Error fetching logs:", error));
         }
 
