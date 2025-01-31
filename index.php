@@ -37,6 +37,7 @@
             font-size: 20px;
             flex-direction: column;
             border-radius: 15px; /* Rounded corners */
+            cursor: pointer; /* Indicate that the box is clickable */
         }
         .right {
             width: 12.5%; /* 1/8th of the screen */
@@ -73,7 +74,7 @@
     <div class="container">
         <div class="left">
             <?php for ($i = 1; $i <= $numBoxes; $i++): ?>
-                <div class="red-box">
+                <div class="red-box" onclick="redbox(<?php echo $i; ?>)">
                     <div>Box <?php echo $i; ?></div>
                 </div>
             <?php endfor; ?>
@@ -106,6 +107,10 @@
                 addAnnouncements(data); // Process and add logs
             })
             .catch(error => console.error("Error fetching logs:", error));
+        }
+		
+		function redbox(boxNumber) {
+            alert("You clicked on Box " + boxNumber);
         }
 
         function addAnnouncements(logs) {
