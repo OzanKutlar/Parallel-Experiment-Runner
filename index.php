@@ -34,7 +34,7 @@
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 20px;
+            font-size: 15px;
             flex-direction: column;
             border-radius: 15px; /* Rounded corners */
             cursor: pointer; /* Indicate that the box is clickable */
@@ -142,7 +142,7 @@
 			
 			const textToPut = `<strong>ID</strong>: ${state.index}<br><strong>State</strong>: ${state.state}<br><strong>PC</strong>: ${state.sentTo}`;
 			
-			box.querySelector('div').textContent = textToPut;
+			box.querySelector('div').innerHTML = textToPut;
 
 			box.style.transition = 'background-color 1s ease';
 			if (state.state === "Finished") {
