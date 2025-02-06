@@ -391,10 +391,8 @@ if __name__ == "__main__":
                 break
             elif user_input.startswith('print '):
                 try:
-                    # Extract index from the command
                     index = int(user_input.split()[1]) - 1
                     if 0 <= index < len(data_array):
-                        # Convert the data at index to JSON and print it
                         print(json.dumps(data_array[index], indent=2))
                         input()
                     else:
@@ -403,20 +401,37 @@ if __name__ == "__main__":
                     print("Invalid command format. Use 'print x', where x is a valid index.")
             elif user_input.startswith('reset '):
                 try:
-                    # Extract index from the command
-                    index = int(user_input.split()[1]) - 1
-                    if 0 <= index < len(givenToPC):
-                        # print(json.dumps(data_array[index], indent=2))
-                        stateLog("Reset", index+1)
-                        log(f"Reset index {index+1} from terminal.")
-                        data_index.append(index)
-                        givenToPC[index] = 'Reset'
-                        completed_array[index] = False
-                        display_colored_array(data_array)
+                    indices = user_input.split()[1]
+                    
+                    if ':' in indices:
+                        start, end = map(int, indices.split(':'))
+                        start, end = start - 1, end - 1
+                        
+                        if 0 <= start < len(givenToPC) and 0 <= end < len(givenToPC) and start <= end:
+                            for index in range(start, end + 1):
+                                stateLog("Reset", index + 1)
+                                log(f"Reset index {index + 1} from terminal.")
+                                data_index.append(index)
+                                givenToPC[index] = 'Reset'
+                                completed_array[index] = False
+                            display_colored_array(data_array)
+                        else:
+                            print(f"Invalid range. Ensure both indices are within 1-{len(givenToPC)} and start ≤ end.")
+                    
                     else:
-                        print(f"Index {index+1} is out of bounds. Array length is 1-{len(givenToPC)}.")
+                        index = int(indices) - 1
+                        if 0 <= index < len(givenToPC):
+                            stateLog("Reset", index + 1)
+                            log(f"Reset index {index + 1} from terminal.")
+                            data_index.append(index)
+                            givenToPC[index] = 'Reset'
+                            completed_array[index] = False
+                            display_colored_array(data_array)
+                        else:
+                            print(f"Index {index + 1} is out of bounds. Array length is 1-{len(givenToPC)}.")
                 except (IndexError, ValueError):
-                    print("Invalid command format. Use 'list x', where x is a valid index.")
+                    print("Invalid command format. Use 'reset x' or 'reset x:y', where x and y are valid indices.")
+
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt detected. Shutting down the server...")
         server.shutdown()
