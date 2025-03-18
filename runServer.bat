@@ -5,7 +5,7 @@ echo %CD%
 if "%ServiceState%"=="RUNNING" (
     echo ssh-agent is running. Continuing.
 ) else (
-    echo sshd is not running. Starting the service...
+    echo ssh-agent is not running. Starting the service...
     powershell -Command "Start-Service -Name ssh-agent"
     echo ssh-agent service started.
 )
@@ -15,8 +15,8 @@ set "CMD2=wsl -u ozan --cd %CD% php -S 0.0.0.0:33000"
 set "CMD3=%CD%/createWebProxy.bat"
 set "CMD4=%CD%/createServerProxy.bat"
 
-set "CMD1=py server.py"
-set "CMD2=pause"
+REM set "CMD1=py server.py"
+REM set "CMD2=pause"
 REM set "CMD3=pause"
 REM set "CMD4=pause"
 
