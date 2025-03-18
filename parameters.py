@@ -1,55 +1,21 @@
 
 shared_params = {
-    "task":["firstTask", "secondTask", "thirdTask"],
-    "pop": [500],
-    "runs": [30],
-    "generation": [350]
+    "iteration":[500, 1000, 1500],
+    "stepSize": [2, 4, 8, 16, 32],
+    "pOfGoal": [0.1],
+    "pOfVC": [0.2],
+    "sp": ["env1", "env2", "env3", "env4"],
+    "algo": ["rrt", "rrt-soft", "rrt-star", "rrt-star-soft", "bi-rrt-star", "bi-rrt-star-soft"]
 }
 
-shared_params2 = {
-    "task":["firstTask", "secondTask", "thirdTask"],
-    "pop": [500],
-    "runs": [20],
-    "generation": [350]
-}
+empty_param = {}
 
-ga_params = {
-    "algo": ["ga"],
-    "mut": [-1.0, 0.2, 0.4, 0.6],
-    "cross": [0.5, 0.419, 0.381],
-    "elitist": ["elitist_full"]
-
-}
-
-de_params = {
-    "algo": ["de"],
-    "variant": [1, 2, 3, 4, 5, 6],
-    "scalingFactor": [0.5, 0.75, 1.0]
-    
-}
-
-pso_params = {
-    "algo": ["pso"],
-    "omega": [0.6, 0.8, 1.0],
-    "cognitiveConstant": [0.5, 2.5, 5.0],
-    "socialConstant": [0.5, 2.5, 5.0]
-
-}
-
-bbbc_params = {
-    "runs": [50],
-    "algo": ["bbbc"]
-
-}
 
 
 data_one, id_counter = generate_combined_data(
     shared_params,
     id_counter,
-    ga_params,
-    de_params,
-    pso_params,
-    bbbc_params
+    empty_param
 )
 
 # data_two, id_counter = generate_combined_data(

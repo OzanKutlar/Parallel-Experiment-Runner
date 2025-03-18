@@ -15,7 +15,7 @@ set "CMD2=wsl -u ozan php -S 0.0.0.0:33000"
 set "CMD3=%CD%/createWebProxy.bat"
 set "CMD4=%CD%/createServerProxy.bat"
 
-set "CMD1=pause"
+set "CMD1=py server.py"
 set "CMD2=pause"
 REM set "CMD3=pause"
 REM set "CMD4=pause"

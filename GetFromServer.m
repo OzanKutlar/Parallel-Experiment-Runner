@@ -24,7 +24,7 @@ function data = GetFromServer(ip, port, maxDelay)
 			return
 		end
 		display(data);
-		%experiment_main(data);
+		fileName = runExperiment(data);
 		delay = round(minDelay + (maxDelay - minDelay) * rand());
         fprintf("Finished Experiment. Delaying for %d seconds before asking for another.\n", delay);
 		nameOfFile = strcat("exp-testing", string(data.id));
@@ -47,7 +47,7 @@ function data = GetFromServer(ip, port, maxDelay)
 end
 
 function fileName = runExperiment(data)
-    
+    disp("Test");
     
 end
 
