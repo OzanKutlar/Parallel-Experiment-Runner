@@ -1,5 +1,5 @@
-function data = GetFromServer(ip, maxDelay)
-    url = sprintf('http://%s:%s', ip, "3753");
+function data = GetFromServer(ip, port, maxDelay)
+    url = sprintf('http://%s:%s', ip, port);
 
 
     computerName = getenv('COMPUTERNAME');
@@ -7,11 +7,12 @@ function data = GetFromServer(ip, maxDelay)
 	options = weboptions('HeaderFields', {'ComputerName', computerName}); % Add the computerName as a header
 
     minDelay = 1;
+
     
     
     delay = round(minDelay + (maxDelay - minDelay) * rand());
     fprintf('Delaying for %d seconds\n', delay);
-    pause(delay); % Pause for the random duration to not DDOS the server.
+    pause(delay);
     
 	
 	for i = 1:100
@@ -26,8 +27,8 @@ function data = GetFromServer(ip, maxDelay)
 		%experiment_main(data);
 		delay = round(minDelay + (maxDelay - minDelay) * rand());
         fprintf("Finished Experiment. Delaying for %d seconds before asking for another.\n", delay);
-		%nameOfFile = strcat("exp-testing", string(data.id));
-        nameOfFile = "exp-testing1";
+		nameOfFile = strcat("exp-testing", string(data.id));
+        % nameOfFile = "exp-testing1";
 		nameOfFile = strcat('experiments/', nameOfFile, '.mat');
 		uploadFileToServerAsJSON(nameOfFile, url, computerName, data.id)
 		options = weboptions(...
@@ -43,21 +44,11 @@ function data = GetFromServer(ip, maxDelay)
     % !taskkill /F /im "matlab.exe"
     return
     
-    
-    % fprintf('Recieved Data : \n\tID: %d\n', data.id);
-    % fprintf('\tFunction: F%d\n', data.func);
-    % fprintf('\tPopulation Size: %s\n', strjoin(string(data.pop), " | "));
-    % fprintf('\tNumber: %d\n', data.number);
-    
-    % index = 0;
-    % for func = 1:height(data.func)
-    %     for pop = 1:height(data.pop)
-    %         for num = 1:height(data.number)
-    %             index = index + 1;
-    %             fprintf('Running attempt %d\n', index);
-    %         end
-    %     end
-    % end
+end
+
+function runExperiment(data)
+
+
 end
 
 function uploadFileToServerAsJSON(fileName, serverUrl, computerName, dataId)
