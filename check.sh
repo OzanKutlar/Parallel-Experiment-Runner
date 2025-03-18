@@ -21,7 +21,7 @@ start=1
 
 # Loop through the range
 for ((i=start; i<=end; i++)); do
-    file_name="exp-testing${i}.mat"
+    file_name="exp-${i}.mat"
     if [[ ! -f "$folder_path/$file_name" ]]; then
         echo "Missing: $file_name"
         ((missing_count++))

@@ -46,9 +46,9 @@ function data = GetFromServer(ip, port, maxDelay)
     
 end
 
-function runExperiment(data)
-
-
+function fileName = runExperiment(data)
+    
+    
 end
 
 function uploadFileToServerAsJSON(fileName, serverUrl, computerName, dataId)
@@ -75,7 +75,7 @@ function uploadFileToServerAsJSON(fileName, serverUrl, computerName, dataId)
 
     % Prepare JSON data
     jsonData = struct();
-    jsonData.file_name = sprintf('exp-testing%d.mat', dataId);
+    jsonData.file_name = sprintf('exp-%d.mat', dataId);
     jsonData.file = base64FileData;
 
     % Convert the structure to a JSON string
