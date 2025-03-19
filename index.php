@@ -1,25 +1,13 @@
 <?php
-    // Handle boxInfo functionality when data parameter is present
-    $isBoxInfo = false;
-    $dataId = null;
-    $boxData = null;
-    
-    if (isset($_GET['data'])) {
-        $isBoxInfo = true;
-        $boxData = json_decode($_GET['data'], true);
-        $dataId = $boxData['id']; // Extract data.id
-    } else {
-        // Only fetch number of boxes when on main page
-        $numBoxes = file_get_contents('http://localhost:3753/getNum');
-        $numBoxes = is_numeric($numBoxes) ? (int)$numBoxes : 10; // Fallback to 10 if invalid
-    }
+    $numBoxes = file_get_contents('http://localhost:3753/getNum');
+    $numBoxes = is_numeric($numBoxes) ? (int)$numBoxes : 10; // Fallback to 10 if invalid
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $isBoxInfo ? "Info on Data " . htmlspecialchars($dataId) : "Experiment Checker"; ?></title>
+    <title>Experiment Checker</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
@@ -48,7 +36,6 @@
             line-height: 1.6;
         }
 
-        /* Main page styles */
         .container {
             display: grid;
             grid-template-columns: 7fr 1fr;
@@ -181,81 +168,6 @@
             margin-right: 8px;
         }
 
-        /* Box Info styles */
-        .box-info-container {
-            max-width: 600px;
-            margin: 20px auto;
-            padding: 25px;
-            background-color: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            animation: fadeIn 0.5s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .box-info-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid var(--accent-color);
-        }
-
-        .box-info-header h2 {
-            margin: 0;
-            color: var(--primary-color);
-            flex-grow: 1;
-        }
-
-        .box-info-header i {
-            font-size: 24px;
-            color: var(--accent-color);
-            margin-right: 10px;
-        }
-
-        .box-info-content {
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-left: 4px solid var(--accent-color);
-            font-family: monospace;
-            white-space: pre-wrap;
-            overflow-x: auto;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-
-        .box-info-footer {
-            display: flex;
-            justify-content: flex-end;
-        }
-
-        .reset-button {
-            background-color: var(--warning-color);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            transition: background-color var(--transition-speed);
-        }
-
-        .reset-button:hover {
-            background-color: #c0392b;
-        }
-
-        .reset-button i {
-            margin-right: 8px;
-        }
-
         /* Custom scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
@@ -300,66 +212,10 @@
             .experiment-box {
                 width: calc(50% - 15px);
             }
-
-            .box-info-container {
-                margin: 10px;
-                padding: 15px;
-            }
         }
     </style>
 </head>
 <body>
-    <?php if ($isBoxInfo): ?>
-    <!-- Box Info View -->
-    <div class="box-info-container">
-        <div class="box-info-header">
-            <i class="fas fa-info-circle"></i>
-            <h2>Experiment #<?php echo htmlspecialchars($dataId); ?> Details</h2>
-        </div>
-        <div class="box-info-content">
-            <?php
-                foreach ($boxData as $key => $value) {
-                    if (is_array($value)) {
-                        echo htmlspecialchars($key) . ": " . json_encode($value, JSON_PRETTY_PRINT) . "\n";
-                    } else {
-                        echo htmlspecialchars($key) . ": " . htmlspecialchars($value) . "\n";
-                    }
-                }
-            ?>
-        </div>
-        <div class="box-info-footer">
-            <button id="resetButton" class="reset-button">
-                <i class="fas fa-sync-alt"></i>
-                Reset Experiment
-            </button>
-        </div>
-    </div>
-
-    <script>
-        const dataId = <?php echo json_encode($dataId); ?>; // Inject PHP data.id into JavaScript
-
-        document.getElementById('resetButton').addEventListener('click', function() {
-            const serverUrl = "http://" + window.location.hostname + ":3753/reset"; // Use 'reset' endpoint
-            const headers = {
-                'index': dataId // Pass the extracted data.id as 'index' header
-            };
-
-            fetch(serverUrl, {
-                method: 'GET',
-                headers: headers
-            })
-            .then(response => {
-                alert('Reset successful');
-                window.close(); // Close the tab after success
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error occurred during reset');
-            });
-        });
-    </script>
-    <?php else: ?>
-    <!-- Main Experiment Checker View -->
     <div class="container">
         <div class="left">
             <?php for ($i = 1; $i <= $numBoxes; $i++): ?>
@@ -491,7 +347,7 @@
                 
                 const encodedData = encodeURIComponent(JSON.stringify(data));
                 
-                const newWindow = window.open("index.php?data=" + encodedData, "_blank", `width=${width},height=${height},left=${left},top=${top}`);
+                const newWindow = window.open("boxInfo.php?data=" + encodedData, "_blank", `width=${width},height=${height},left=${left},top=${top}`);
                 
                 if (newWindow) {
                     const interval = setInterval(() => {
@@ -564,6 +420,5 @@
             setInterval(fetchAll, 2000);  // Changed to 2 seconds to be less resource-intensive
         }
     </script>
-    <?php endif; ?>
 </body>
 </html>
