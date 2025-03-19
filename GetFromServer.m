@@ -24,17 +24,17 @@ function data = GetFromServer(ip, port, maxDelay)
 			return
 		end
 		display(data);
-		fileName = runExperiment(data);
 		delay = round(minDelay + (maxDelay - minDelay) * rand());
         fprintf("Finished Experiment. Delaying for %d seconds before asking for another.\n", delay);
-		nameOfFile = strcat("exp-testing", string(data.id));
+		% nameOfFile = strcat("exp-testing", string(data.id));
         % nameOfFile = "exp-testing1";
-		nameOfFile = strcat('experiments/', nameOfFile, '.mat');
+		% nameOfFile = strcat('experiments/', nameOfFile, '.mat');
+        nameOfFile = runExperiment(data);
 		uploadFileToServerAsJSON(nameOfFile, url, computerName, data.id)
 		options = weboptions(...
 			'HeaderFields', {...
 				'ComputerName', computerName; ...
-				'ID', num2str(dataId) ...
+				'ID', num2str(data.id) ...
 			}...
 		);
 		pause(delay);
@@ -48,7 +48,8 @@ end
 
 function fileName = runExperiment(data)
     disp("Test");
-    
+    pause(1);
+    fileName = "check.sh";
 end
 
 function uploadFileToServerAsJSON(fileName, serverUrl, computerName, dataId)

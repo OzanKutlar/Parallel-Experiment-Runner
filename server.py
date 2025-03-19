@@ -156,10 +156,11 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         # try:
+            computer_name = self.headers.get('ComputerName', 'Null')
             ID = self.headers.get('ID', '-1')
             if(ID != '-1'):
                 log(f"Recieved Data : {ID}")
-                stateLog("Finished", int(ID))
+                stateLog("Finished", int(ID), computer_name)
                 print("ID " + ID + " is finished.")
                 completed_array[int(ID) - 1] = True
                 

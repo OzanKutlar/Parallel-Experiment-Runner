@@ -308,11 +308,11 @@
             box.classList.remove('running', 'finished');
             
             if (state.state === "Finished") {
-                textToPut = `${boxNumber} Finished by ${state.sentTo}`;
+                textToPut = `${boxNumber} was Finished by ${state.sentTo}`;
                 iconClass = 'fas fa-check-circle';
                 box.classList.add('finished');
             } else if (state.state === "Running") {
-                textToPut = `${boxNumber} Running on ${state.sentTo}`;
+                textToPut = `${boxNumber} is Running on ${state.sentTo}`;
                 iconClass = 'fas fa-cog fa-spin';
                 box.classList.add('running');
             } else if (state.state === "Reset") {
