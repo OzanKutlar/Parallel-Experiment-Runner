@@ -1,9 +1,6 @@
 
 shared_params = {
-    "iteration":[500, 1000, 1500],
-    "stepSize": [2, 4, 8, 16, 32],
-    "pOfGoal": [0.1],
-    "pOfVC": [0.2],
+    "combIdx": list(range(1,5)),
     "sp": ["env1", "env2", "env3", "env4"],
     "algo": ["rrt", "rrt-soft", "rrt-star", "rrt-star-soft", "bi-rrt-star", "bi-rrt-star-soft"]
 }

@@ -74,14 +74,6 @@ if (isset($_GET['data'])) {
 </head>
 <body>
     <div class="container">
-        <h1>Data Information</h1>
-        <?php if (isset($data)): ?>
-            <div class="data-display">
-                <?php print_r($data); ?>
-            </div>
-        <?php else: ?>
-            <p>No data available.</p>
-        <?php endif; ?>
         
         <button id="resetButton">Reset Data</button>
         <div id="statusMessage" class="status"></div>

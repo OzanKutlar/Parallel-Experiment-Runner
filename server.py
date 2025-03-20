@@ -323,7 +323,7 @@ def start_server(server):
     server.serve_forever()
 
 if __name__ == "__main__":
-    os.system("cls")
+    print("\033[2J\033[H", end="")  # Clear the screen
     if len(sys.argv) > 1:
         data_index.append(int(sys.argv[1]) - 1)
         if(data_index[-1] < 0):
