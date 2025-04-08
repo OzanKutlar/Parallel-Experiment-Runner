@@ -417,7 +417,7 @@
         
         window.onload = function() {
             fetchAll();
-            setInterval(fetchAll, 2000);  // Changed to 2 seconds to be less resource-intensive
+            setInterval(fetchAll, 500);  // Changed to 2 seconds to be less resource-intensive
         }
     </script>
 </body>
