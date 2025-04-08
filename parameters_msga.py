@@ -22,9 +22,15 @@ data_one, id_counter = generate_combined_data(
 seen = set()
 pruned_list = []
 id_counter = 1
+funcVal = None
+
 for obj in data_one:
-    # Create and sort the vector
-    vec = sorted([obj['func'], obj['algo1'], obj['algo2'], obj['algo3'], obj['algo4']])
+    
+    if not funcVal or funcVal != obj['func']:
+        seen = set()
+        funcVal = obj['func']
+
+    vec = sorted([obj['algo1'], obj['algo2'], obj['algo3'], obj['algo4']])
     vec_tuple = tuple(vec)  # Tuples are hashable and can go in a set
 
     if vec_tuple in seen:
