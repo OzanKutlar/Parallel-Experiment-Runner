@@ -72,30 +72,36 @@ data_one, id_counter = generate_combined_data(
 )
 
 
-seen = set()
 pruned_list = []
 id_counter = 1
 funcVal = None
 
-for obj in data_one:
-    
-    if not funcVal or funcVal != obj['func']:
-        seen = set()
-        funcVal = obj['func']
+grouped_sets = {}
 
-    vec = sorted([obj['algo1'], obj['algo2'], obj['algo3'], obj['algo4']])
+for obj in data_one:
+    vec = sorted([obj['algo1'], obj['algo2'], obj['algo3'], obj['algo4'], obj['pop']])
     vec_tuple = tuple(vec)
 
-    if vec_tuple in seen:
+    # Create the group key
+    group_key = f"{obj['year']}_F{obj['func']}"
+
+    # Initialize the group if it doesn't exist
+    if group_key not in grouped_sets:
+        grouped_sets[group_key] = set()
+
+    if vec_tuple in grouped_sets[group_key]:
         continue
     else:
         obj['id'] = id_counter
         id_counter += 1
-        seen.add(vec_tuple)
+        grouped_sets[group_key].add(vec_tuple)
         pruned_list.append(obj)
 
 
 
+
+# print_list_as_json(pruned_list);
+# exit();
 
 # data_two, id_counter = generate_combined_data(
     # shared_params2,
