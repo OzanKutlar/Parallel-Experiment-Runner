@@ -1,6 +1,13 @@
 <?php
     $numBoxes = file_get_contents('http://localhost:3753/getNum');
     $numBoxes = is_numeric($numBoxes) ? (int)$numBoxes : 10; // Fallback to 10 if invalid
+    
+    // Pagination setup
+    $boxesPerPage = 100;
+    $totalPages = ceil($numBoxes / $boxesPerPage);
+    $currentPage = isset($_GET['page']) ? max(1, min($totalPages, (int)$_GET['page'])) : 1;
+    $startBox = ($currentPage - 1) * $boxesPerPage + 1;
+    $endBox = min($startBox + $boxesPerPage - 1, $numBoxes);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -46,11 +53,27 @@
 
         .left {
             display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .boxes-container {
+            display: flex;
             flex-wrap: wrap;
             padding: 20px;
             gap: 15px;
             align-content: flex-start;
             overflow-y: auto;
+            flex: 1;
+        }
+
+        .pagination-container {
+            padding: 15px 20px;
+            background-color: var(--secondary-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-top: 1px solid #ddd;
         }
 
         .experiment-box {
@@ -168,6 +191,80 @@
             margin-right: 8px;
         }
 
+        /* Pagination styles */
+        .pagination {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .page-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+            height: 36px;
+            background-color: white;
+            color: var(--primary-color);
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            border: 1px solid #ddd;
+            transition: all 0.2s;
+            padding: 0 10px;
+        }
+
+        .page-link:hover {
+            background-color: #f1f1f1;
+        }
+
+        .page-link.active {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .page-link.disabled {
+            color: #aaa;
+            cursor: not-allowed;
+        }
+
+        .page-jump {
+            display: flex;
+            align-items: center;
+            margin-left: 10px;
+        }
+
+        .page-jump input {
+            width: 60px;
+            height: 36px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 0 10px;
+            margin: 0 5px;
+            text-align: center;
+        }
+
+        .page-jump button {
+            height: 36px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 0 15px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .page-jump button:hover {
+            background-color: #2980b9;
+        }
+
+        .page-info {
+            color: #666;
+            margin-right: 15px;
+        }
+
         /* Custom scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
@@ -212,19 +309,84 @@
             .experiment-box {
                 width: calc(50% - 15px);
             }
+
+            .pagination {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .page-jump {
+                width: 100%;
+                justify-content: center;
+                margin-top: 10px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="left">
-            <?php for ($i = 1; $i <= $numBoxes; $i++): ?>
-                <div class="experiment-box" id="box-<?php echo $i; ?>" onclick="redbox(<?php echo $i; ?>)">
-                    <div class="status-icon"><i class="fas fa-hourglass-half"></i></div>
-                    <div class="box-content"><?php echo $i; ?> is Waiting</div>
+            <div class="boxes-container">
+                <?php for ($i = $startBox; $i <= $endBox; $i++): ?>
+                    <div class="experiment-box" id="box-<?php echo $i; ?>" onclick="redbox(<?php echo $i; ?>)">
+                        <div class="status-icon"><i class="fas fa-hourglass-half"></i></div>
+                        <div class="box-content"><?php echo $i; ?> is Waiting</div>
+                    </div>
+                <?php endfor; ?>
+            </div>
+            
+            <?php if ($numBoxes > $boxesPerPage): ?>
+            <div class="pagination-container">
+                <div class="page-info">
+                    Showing boxes <?php echo $startBox; ?> to <?php echo $endBox; ?> of <?php echo $numBoxes; ?>
                 </div>
-            <?php endfor; ?>
+                <div class="pagination">
+                    <?php
+                    // Previous button
+                    $prevDisabled = $currentPage <= 1 ? 'disabled' : '';
+                    $prevPage = max(1, $currentPage - 1);
+                    echo "<a href='?page={$prevPage}' class='page-link {$prevDisabled}'><i class='fas fa-chevron-left'></i></a>";
+                    
+                    // Page numbers
+                    $startPageButton = max(1, $currentPage - 2);
+                    $endPageButton = min($totalPages, $startPageButton + 4);
+                    
+                    if ($startPageButton > 1) {
+                        echo "<a href='?page=1' class='page-link'>1</a>";
+                        if ($startPageButton > 2) {
+                            echo "<span class='page-link disabled'>...</span>";
+                        }
+                    }
+                    
+                    for ($p = $startPageButton; $p <= $endPageButton; $p++) {
+                        $activeClass = $p == $currentPage ? 'active' : '';
+                        echo "<a href='?page={$p}' class='page-link {$activeClass}'>{$p}</a>";
+                    }
+                    
+                    if ($endPageButton < $totalPages) {
+                        if ($endPageButton < $totalPages - 1) {
+                            echo "<span class='page-link disabled'>...</span>";
+                        }
+                        echo "<a href='?page={$totalPages}' class='page-link'>{$totalPages}</a>";
+                    }
+                    
+                    // Next button
+                    $nextDisabled = $currentPage >= $totalPages ? 'disabled' : '';
+                    $nextPage = min($totalPages, $currentPage + 1);
+                    echo "<a href='?page={$nextPage}' class='page-link {$nextDisabled}'><i class='fas fa-chevron-right'></i></a>";
+                    ?>
+                    
+                    <div class="page-jump">
+                        <form id="jumpToPageForm" onsubmit="return jumpToPage()">
+                            <input type="number" id="pageInput" min="1" max="<?php echo $totalPages; ?>" placeholder="Page">
+                            <button type="submit">Go</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
+        
         <div class="right">
             <div class="sidebar-header">
                 <i class="fas fa-clipboard-list"></i>
@@ -240,6 +402,9 @@
     <script>
         let lastLog = -1;
         let lastState = -1;
+        let currentPage = <?php echo $currentPage; ?>;
+        let boxesPerPage = <?php echo $boxesPerPage; ?>;
+        let totalPages = <?php echo $totalPages; ?>;
         
         function fetchAll() {
             fetchLogs();
@@ -415,9 +580,22 @@
             setTimeout(() => announcement.style.opacity = 1, 50);
         }
         
+        function jumpToPage() {
+            const pageInput = document.getElementById('pageInput');
+            const page = parseInt(pageInput.value);
+            
+            if (page >= 1 && page <= totalPages) {
+                window.location.href = `?page=${page}`;
+            } else {
+                showErrorAnnouncement(`Please enter a page number between 1 and ${totalPages}`);
+            }
+            
+            return false; // Prevent form submission
+        }
+        
         window.onload = function() {
             fetchAll();
-            setInterval(fetchAll, 500);  // Changed to 2 seconds to be less resource-intensive
+            setInterval(fetchAll, 500);  // Poll every 500ms
         }
     </script>
 </body>
