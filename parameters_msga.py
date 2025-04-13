@@ -1,11 +1,59 @@
 shared_params = {
-    "maxFE": [200000],
-    "pop": [100],
-    "func": list(range(1,11)),
+    "pop": [100, 200, 500],
+    # "repeat": [5],
     "algo1": [1,2,3,4],
     "algo2": [1,2,3,4],
     "algo3": [1,2,3,4],
     "algo4": [1,2,3,4]
+}
+
+cec2008 = {
+    "year": ["2008"],
+    "maxFE": [5_000_000],
+    "func": list(range(1,7)),
+    "repeat": [30],
+    "D": [1000]
+}
+
+cec2008_f7 = {
+    "year": ["2008"],
+    "maxFE": [37_500_000],
+    "func": [7],
+    "repeat": [30],
+    "D": [7500]
+}
+
+cec2010 = {
+    "maxFE": [300_000],
+    "func": list(range(1, 19)),
+    "repeat": [25],
+    "year": ["2010"],
+    "D": [30]
+}
+
+cec2013 = {
+    "maxFE": [3_000_000],
+    "func": list(range(1, 16)),
+    "repeat": [25],
+    "year": ["2013"],
+    "D": [1000]
+}
+
+
+cec2017 = {
+    "maxFE": [2_000_000],
+    "func": list(range(1, 29)),
+    "repeat": [25],
+    "year": ["2017"],
+    "D": [100]
+}
+
+cec2020 = {
+    "maxFE": [1_000_000],
+    "func": list(range(1, 11)),
+    "repeat": [30],
+    "year": ["2020"],
+    "D": [100]
 }
 
 empty_param = {}
@@ -15,7 +63,12 @@ empty_param = {}
 data_one, id_counter = generate_combined_data(
     shared_params,
     id_counter,
-    empty_param
+    cec2008,
+    cec2008_f7,
+    cec2010,
+    cec2013,
+    cec2017,
+    cec2020
 )
 
 
@@ -31,7 +84,7 @@ for obj in data_one:
         funcVal = obj['func']
 
     vec = sorted([obj['algo1'], obj['algo2'], obj['algo3'], obj['algo4']])
-    vec_tuple = tuple(vec)  # Tuples are hashable and can go in a set
+    vec_tuple = tuple(vec)
 
     if vec_tuple in seen:
         continue
