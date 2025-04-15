@@ -2,7 +2,7 @@
 shared_params = {
     "combIdx": list(range(1,5)),
     "sp": ["env1", "env2", "env3", "env4"],
-    "algo": ["rrt", "rrt-soft", "rrt-star", "rrt-star-soft", "bi-rrt-star", "bi-rrt-star-soft"]
+    "algo": [15]
 }
 
 empty_param = {}
