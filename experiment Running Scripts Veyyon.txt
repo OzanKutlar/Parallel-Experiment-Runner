@@ -1,0 +1,15 @@
+powershell -Command Expand-Archive "C:\Users\exam\soft-robots-studio-3d.zip"
+
+powershell -Command Move-Item "C:\Users\exam\soft-robots-studio-3d\soft-robots-studio-3d" "C:\Users\exam\Desktop"
+
+matlab -sd "C:\Users\exam\Desktop\soft-robots-studio-3d" -r "GetFromServer('171.22.173.112', 30)"
+
+taskkill /f /im "matlab*"
+
+taskkill /f /im "cmd.exe"
+
+powershell -Command Remove-Item -Recurse -Force "C:\Users\exam\soft-robots-studio-3d"
+
+powershell -Command Remove-Item -Recurse -Force "C:\Users\exam\soft-robots-studio-3d.zip"
+
+powershell -Command Remove-Item -Recurse -Force "C:\Users\exam\Desktop\soft-robots-studio-3d"
