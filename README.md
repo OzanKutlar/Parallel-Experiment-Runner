@@ -24,7 +24,6 @@ example_shared_params = {
 
 > 💡 Each experiment will be automatically assigned a unique `id` in addition to the parameters you define.
 
----
 
 ### 2. Modify Your Project to Communicate with the Server
 
@@ -33,6 +32,17 @@ Each client machine (running experiments) must:
 #### ✅ GET a Task
 
 Send a GET request to the root endpoint (`http://<server_ip>:3753`). The server responds with a JSON object representing an experiment configuration.
+
+**📥 Example response from server:**
+
+```json
+{
+  "combIdx": 1,
+  "sp": "env1",
+  "algo": "rrt",
+  "id": 1
+}
+```
 
 **✅ Add these headers:**
 - `ComputerName`: your machine's name (`getenv('COMPUTERNAME')` in MATLAB)
