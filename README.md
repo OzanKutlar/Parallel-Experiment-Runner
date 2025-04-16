@@ -1,40 +1,51 @@
-# 🧪 Parallel Experiment Runner
+# Parallel Experiment Runner
 
-A lightweight Python server and a simple API-based protocol for distributing and executing experiments in parallel across multiple computers—perfect for large-scale simulations or distributed research tasks.
+This project is designed to easily distribute and run large numbers of experiments across multiple computers in parallel using a simple API server. Each machine retrieves parameters, runs an experiment, and sends back results.
 
 ---
 
-## 🚀 Getting Started
+## 🔧 Step 1: Define Your Experiment Parameters
 
-This guide will walk you through setting up your experiments and running them on multiple machines.
+Start by creating your experiment parameters file. You can tweak the existing example and save it as something like `parameters_experiment.py`.
 
-### 1. Define Your Experiment Parameters
-
-Start by creating a parameter definition file based on the example.
+### Example `parameters_experiment.py`
 
 ```python
-# parameters_experiment.py
-
 example_shared_params = {
-    "combIdx": list(range(1, 5)),        # Multiple values: creates 4 experiments
-    "sp": ["env1", "env2", "env3", "env4"],  # Another variable to test over
-    "algo": [15],                        # Static value for all experiments
+    "combIdx": list(range(1, 5)),   # Will result in 4 different experiments
+    "sp": ["env1", "env2", "env3", "env4"],  # Each experiment will get a different environment
+    "algo": [15]  # This parameter remains constant across all experiments
 }
 ```
 
-> 💡 Each experiment will be automatically assigned a unique `id` in addition to the parameters you define.
+> Note: Each experiment is also automatically assigned a unique `id` parameter by the server.
 
+---
 
-### 2. Modify Your Project to Communicate with the Server
+## 🌐 Step 2: Modify Your Project to Use the API
 
-Each client machine (running experiments) must:
+Each experiment must communicate with the central API server:
 
-#### ✅ GET a Task
+- **GET requests** fetch a new experiment to run.
+- **POST requests** send back results.
 
-Send a GET request to the root endpoint (`http://<server_ip>:3753`). The server responds with a JSON object representing an experiment configuration.
+### 📥 GET Request (First Time)
 
-**📥 Example response from server:**
+All experiment requests should hit the root endpoint, e.g., `http://localhost:3753`.
 
+> **Include a random startup delay to avoid flooding the server!**  
+> Use a delay of about **1/5 the number of total computers**.
+
+### ✅ Example MATLAB GET Code (First Request Only)
+
+```matlab
+url = sprintf('http://localhost:3753');
+computerName = getenv('COMPUTERNAME');
+options = weboptions('HeaderFields', {'ComputerName', computerName});
+data = webread(url, options);
+```
+
+Example server response:
 ```json
 {
   "combIdx": 1,
@@ -44,117 +55,120 @@ Send a GET request to the root endpoint (`http://<server_ip>:3753`). The server 
 }
 ```
 
-**✅ Add these headers:**
-- `ComputerName`: your machine's name (`getenv('COMPUTERNAME')` in MATLAB)
-- Optional: `ID` of the previous experiment (if re-requesting or retrying)
+MATLAB automatically parses the response, so you can access `data.sp`, `data.id`, etc.
 
-**🧪 Example MATLAB GET Request:**
+---
+
+### 🔄 GET Request (Subsequent Calls)
+
+**Important:** After your experiment finishes, you must **include the `ID` header** in the next GET request. This tells the server what experiment you just finished and prevents data loss.
+
 ```matlab
-url = sprintf('http://localhost:3753');
-computerName = getenv('COMPUTERNAME');
-options = weboptions('HeaderFields', {'ComputerName', computerName});
+options = weboptions('HeaderFields', {
+    'ComputerName', computerName;
+    'ID', num2str(data.id)
+});
 data = webread(url, options);
-
-% Access values like:
-% data.combIdx, data.sp, data.algo, data.id
 ```
 
-> 🧊 If no tasks remain, the server will respond with:
+---
+
+## 📤 POST Request – Sending Results
+
+Once an experiment is done, send back the result file with a POST request.
+
+**POST Requirements:**
+
+- Headers:
+  - `ComputerName`
+  - `ID` (the experiment ID)
+- JSON Body:
+  ```json
+  {
+    "file_name": "exp_1.mat",
+    "file": "<base64_encoded_file_contents>"
+  }
+  ```
+
+> If you do **not** implement this step, see shutdown guidance below.
+
+---
+
+## 🛑 No More Experiments
+
+When there are no more experiments left, the server will respond with:
+
 ```json
-{"message": "No more data left."}
+{ "message": "No more data left." }
 ```
-You should exit the client at this point.
+
+### Example MATLAB Handling
 
 ```matlab
 if isfield(data, 'message')
-    fprintf('Stopping with message : %s\nI ran %d experiments.\n', data.message, i);
+    fprintf('Stopping with message: %s\nI ran %d experiments.\n', data.message, i);
     !start selfDestruct.bat
     return
 end
 ```
 
-> 🔄 Not using POST to report results? Replace `!start selfDestruct.bat` with:
+> If you're not using POST, replace the line with:
 ```matlab
 !shutdown /s /t 360
 !taskkill /F /im "matlab.exe"
 ```
 
-#### 📤 POST Results (Optional)
+---
 
-If you’re using POST, check the `uploadFileToServerAsJSON` function in `GetFromServer.m` for uploading your result files back to the server.
+## 💣 Step 3: Self-Destruct (Recommended)
+
+To clean up automatically, write a script similar to `selfDestruct.bat` that deletes the experiment folder after it's done.
 
 ---
 
-### 3. (Optional) Auto-Termination After Completion
+## 📦 Step 4: Distribute the Project
 
-Add a `selfDestruct.bat` file to your project so that it gracefully shuts down the client machine once all experiments are done. You can also directly embed the shutdown code as shown above.
-
----
-
-### 4. Distribute Your Project
-
-Compress your entire experiment project folder:
-
-```bash
-# Example structure:
-MyExperiment/
-├── GetFromServer.m
-├── parameters_experiment.py
-├── selfDestruct.bat
-├── your_scripts.m
-└── ...
-```
-
-> ✅ Zip it up and distribute to remote machines using tools like **Veyon**.
+Once everything is ready:
+- Zip the entire folder.
+- Send it to all target machines (e.g., using [Veyon](https://veyon.io)).
 
 ---
 
-### 5. Unzip Remotely
+## 📂 Step 5: Unzip on Each Machine
 
-On the client machine, unzip with PowerShell:
+Use PowerShell to unzip the archive on each remote machine:
 
 ```powershell
-powershell -Command Expand-Archive "C:\path\to\your.zip"
+powershell -Command Expand-Archive "%Absolute Path to zip%"
 ```
 
 ---
 
-### 6. Run the Experiment Client
+## ▶️ Step 6: Start the Experiment
 
-Launch MATLAB and run your fetch-execute loop:
+Launch the experiment runner from MATLAB like this:
 
 ```bash
-matlab -sd "C:\path\to\unzipped_folder" -r "GetFromServer('171.22.173.112', 30)"
+matlab -sd "%Path_to_running_folder%" -r "GetFromServer('171.22.173.112', 30)"
 ```
 
-- Replace `171.22.173.112` with your server’s IP.
-- `30` is an optional delay between retries or failed attempts.
+- `Path_to_running_folder`: The path where the zip was extracted.
+- `171.22.173.112`: Replace with the server's IP.
+- `30`: Random delay.
 
 ---
 
-## 📂 Repository Structure
+## ✅ Summary
 
-```
-Parallel-Experiment-Runner/
-├── server.py                  # API server that distributes experiments
-├── create_comb_from_shared.py # Builds experiment combinations
-├── parameters_example.py      # Parameter file template
-├── README.md                  # You're reading it!
-└── ...
-```
+- Define experiment parameters
+- Connect your experiment to the API (GET + POST)
+- Add a delay to avoid server overload
+- Include `ID` header in subsequent GETs
+- Handle end-of-experiment response
+- Distribute, unzip, and run
 
 ---
 
-## 🛠 Requirements
+For any bugs or contributions, feel free to open an issue or pull request.
 
-- Python 3.x (for the server)
-- MATLAB (on client machines)
-
----
-
-## 📬 Contact
-
-Feel free to open an issue or fork the repo for improvements.
-
-👉 [GitHub Repo](https://github.com/OzanKutlar/Parallel-Experiment-Runner)
-
+Happy experimenting! 🚀
