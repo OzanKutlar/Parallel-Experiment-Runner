@@ -5,6 +5,7 @@ import time
 import sys
 import threading
 import base64
+import numpy as np
 
 # Server settings
 host = "0.0.0.0"
@@ -178,7 +179,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             # Parse JSON data
             json_data = json.loads(post_data)
 
-            # Extract file data and name
+            
             file_name = json_data.get('file_name')
             file_content_base64 = json_data.get('file')
             

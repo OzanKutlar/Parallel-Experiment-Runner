@@ -1,10 +1,10 @@
 shared_params = {
     "pop": [100, 200, 500],
     # "repeat": [5],
-    "algo1": [1,2,3,4],
-    "algo2": [1,2,3,4],
-    "algo3": [1,2,3,4],
-    "algo4": [1,2,3,4]
+    "tournamentPer": [0, 0.25, 0.5, 0.75, 1],
+    "stocPer": [0, 0.25, 0.5, 0.75, 1],
+    "rankPer": [0, 0.25, 0.5, 0.75, 1],
+    "truncPer": [0, 0.25, 0.5, 0.75, 1]
 }
 
 # https://www.researchgate.net/publication/228932005_Benchmark_functions_for_the_CEC'2008_special_session_and_competition_on_large_scale_global_optimization
@@ -84,33 +84,32 @@ data_one, id_counter = generate_combined_data(
     cec2020
 )
 
+def norm(v):
+    v = np.array(v)
+    norm = np.linalg.norm(v)
+    if norm == 0:
+        return v 
+    return v / norm
 
 pruned_list = []
 id_counter = 1
 funcVal = None
 
-prime_list = {1: 2, 2: 3, 3: 5, 4: 7}
 
 grouped_sets = {}
 
 
 for obj in data_one:
-    vec = prime_list[obj['algo1']] * prime_list[obj['algo2']] * prime_list[obj['algo3']] * prime_list[obj['algo4']]
 
-    # Create the group key
-    group_key = f"{obj['year']}_F{obj['func']}_P{obj['pop']}"
-
-    # Initialize the group if it doesn't exist
-    if group_key not in grouped_sets:
-        grouped_sets[group_key] = set()
-
-    if vec in grouped_sets[group_key]:
+    resultVec = [obj['tournamentPer'] + obj['stocPer'] + obj['rankPer'] + obj['truncPer']]
+    
+    
+    if(sum(resultVec) != 1):
         continue
-    else:
-        obj['id'] = id_counter
-        id_counter += 1
-        grouped_sets[group_key].add(vec)
-        pruned_list.append(obj)
+    
+    obj['id'] = id_counter
+    id_counter += 1
+    pruned_list.append(obj)
 
 
 
