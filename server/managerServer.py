@@ -15,6 +15,7 @@ class ManagerServer:
         self.master_socket = None
         self.manager_name = platform.node()  # Get computer name
         self.clients = {}  # {client_address: client_name}
+        self.client_sockets = {}  # {client_name: client_socket}
         self.lock = threading.Lock()
         
     def connect_to_master(self):
@@ -50,13 +51,103 @@ class ManagerServer:
                     print("Connection to master server lost")
                     break
                 
-                # Handle commands from master if needed
-                print(f"Received from master: {data}")
+                # Parse and handle commands from master
+                try:
+                    message = json.loads(data)
+                    print(f"Received from master: {message}")
+                    
+                    # Handle the close_client command
+                    if message.get('type') == 'close_client':
+                        client_name = message.get('client_name')
+                        if client_name:
+                            self.close_client(client_name)
+                    
+                    # Handle the close_manager command
+                    elif message.get('type') == 'close_manager':
+                        action = message.get('action')
+                        if action == 'close_all_clients':
+                            self.close_all_clients()
+                        elif action == 'shutdown':
+                            print("Received shutdown command from master")
+                            # Send acknowledgement before shutting down
+                            ack = {
+                                'type': 'shutdown_ack',
+                                'status': 'shutting_down'
+                            }
+                            self.master_socket.send(json.dumps(ack).encode('utf-8'))
+                            # Gracefully shut down the server
+                            threading.Thread(target=self.shutdown).start()
+                
+                except json.JSONDecodeError:
+                    print(f"Received invalid JSON from master")
                 
         except Exception as e:
             print(f"Error in master communication: {e}")
         finally:
             self.master_socket.close()
+    
+    def close_client(self, client_name):
+        """Close the connection to a specific client."""
+        with self.lock:
+            if client_name in self.client_sockets:
+                try:
+                    # Send close command to client
+                    close_message = {
+                        'type': 'close_command',
+                        'reason': 'Closed by master server'
+                    }
+                    self.client_sockets[client_name].send(json.dumps(close_message).encode('utf-8'))
+                    print(f"Sent close command to client {client_name}")
+                    
+                    # We don't close the socket here - the client should disconnect gracefully
+                    # The socket will be removed when the client disconnects in handle_client
+                    
+                    return True
+                except Exception as e:
+                    print(f"Error closing client {client_name}: {e}")
+                    # If we can't send the message, force close the socket
+                    try:
+                        self.client_sockets[client_name].close()
+                    except:
+                        pass
+                    # Remove from our tracking
+                    self.client_sockets.pop(client_name, None)
+                    # Find and remove from clients dict
+                    for addr, name in list(self.clients.items()):
+                        if name == client_name:
+                            self.clients.pop(addr)
+                            break
+                    
+                    # Notify master about client disconnection
+                    self.notify_client_connection(client_name, connected=False)
+            else:
+                print(f"Client {client_name} not found")
+                return False
+    
+    def close_all_clients(self):
+        """Close all client connections."""
+        with self.lock:
+            client_names = list(self.client_sockets.keys())
+        
+        for client_name in client_names:
+            self.close_client(client_name)
+    
+    def shutdown(self):
+        """Shut down the manager server."""
+        # First close all clients
+        self.close_all_clients()
+        time.sleep(1)  # Give clients time to disconnect
+        
+        # Then close the server socket
+        if self.server_socket:
+            try:
+                self.server_socket.close()
+            except:
+                pass
+        
+        print("Manager server shutting down")
+        import os, signal
+        os._exit(0)  # Force exit the process
     
     def notify_client_connection(self, client_name, connected=True):
         """Notify the master server about a client connection/disconnection."""
@@ -110,6 +201,7 @@ class ManagerServer:
             
             with self.lock:
                 self.clients[address] = client_name
+                self.client_sockets[client_name] = client_socket
                 print(f"New client connected: {client_name} ({address[0]}:{address[1]})")
             
             # Notify master about new client
@@ -153,6 +245,8 @@ class ManagerServer:
                     client_name = self.clients[address]
                     print(f"Client {client_name} disconnected")
                     self.clients.pop(address)
+                    if client_name in self.client_sockets:
+                        self.client_sockets.pop(client_name)
                     
             # Notify master about client disconnection
             if client_name:

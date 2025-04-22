@@ -189,28 +189,128 @@ class CustomRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         """Handle GET requests to the server."""
         parsed_path = urlparse(self.path)
-        if parsed_path.path == '/getManagers':
+        path = parsed_path.path
+        
+        if path == '/getManagers':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             managers = [{"manager_id": address, "name": info["name"]} for address, info in self.master_server.managers.items()]
             self.wfile.write(json.dumps(managers).encode('utf-8'))
-        elif parsed_path.path == '/getManagerCount':
+        
+        elif path == '/getManagerCount':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({"count": self.master_server.get_manager_count()}).encode('utf-8'))
-        elif parsed_path.path == '/getTotalClientCount':
+        
+        elif path == '/getTotalClientCount':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({"count": self.master_server.get_total_client_count()}).encode('utf-8'))
+        
+        elif path == '/getManagerDetails':
+            query = parse_qs(parsed_path.query)
+            if 'id' in query:
+                try:
+                    manager_id = json.loads(query['id'][0])
+                    manager_id = tuple(manager_id)  # Convert list to tuple for dictionary key
+                    
+                    with self.master_server.lock:
+                        if manager_id in self.master_server.managers:
+                            manager_info = self.master_server.managers[manager_id]
+                            details = {
+                                "name": manager_info["name"],
+                                "clients": manager_info["clients"],
+                                "address": list(manager_id)  # Convert tuple to list for JSON
+                            }
+                            self.send_response(200)
+                            self.send_header('Content-type', 'application/json')
+                            self.end_headers()
+                            self.wfile.write(json.dumps(details).encode('utf-8'))
+                            return
+                except Exception as e:
+                    print(f"Error in getManagerDetails: {e}")
+            
+            # If we reach here, either the ID was not provided or the manager was not found
+            self.send_response(404)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Manager not found"}).encode('utf-8'))
+        
         else:
             self.send_response(404)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
-            self.wfile.write(b"Invalid request. Use /getManagers to get manager list.")
-        return
+            self.wfile.write(b"Endpoint not found")
+
+    def do_POST(self):
+        """Handle POST requests to the server."""
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        
+        try:
+            data = json.loads(post_data.decode('utf-8'))
+            parsed_path = urlparse(self.path)
+            path = parsed_path.path
+            
+            if path == '/closeManager':
+                if 'manager_id' in data:
+                    manager_id = tuple(data['manager_id'])  # Convert list to tuple for dictionary key
+                    
+                    with self.master_server.lock:
+                        if manager_id in self.master_server.managers:
+                            success = self.master_server.close_manager(manager_id)
+                            self.send_response(200)
+                            self.send_header('Content-type', 'application/json')
+                            self.end_headers()
+                            self.wfile.write(json.dumps({"success": success}).encode('utf-8'))
+                            return
+                    
+                    # Manager not found
+                    self.send_response(404)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": False, "error": "Manager not found"}).encode('utf-8'))
+            
+            elif path == '/closeClient':
+                if 'manager_id' in data and 'client_name' in data:
+                    manager_id = tuple(data['manager_id'])  # Convert list to tuple for dictionary key
+                    client_name = data['client_name']
+                    
+                    with self.master_server.lock:
+                        if manager_id in self.master_server.managers:
+                            # Send close command to the manager
+                            message = {
+                                'type': 'close_client',
+                                'client_name': client_name
+                            }
+                            success = self.master_server.sendMessage(manager_id, message)
+                            
+                            self.send_response(200)
+                            self.send_header('Content-type', 'application/json')
+                            self.end_headers()
+                            self.wfile.write(json.dumps({"success": success}).encode('utf-8'))
+                            return
+                    
+                    # Manager not found
+                    self.send_response(404)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": False, "error": "Manager not found"}).encode('utf-8'))
+            
+            else:
+                self.send_response(404)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": "Endpoint not found"}).encode('utf-8'))
+        
+        except Exception as e:
+            self.send_response(400)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
 
 # Custom HTTP server that knows about the MasterServer
 class MasterHTTPServer(HTTPServer):

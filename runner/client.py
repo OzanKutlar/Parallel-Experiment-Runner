@@ -4,6 +4,7 @@ import threading
 import time
 import platform
 import argparse
+import sys
 
 class Client:
     def __init__(self, manager_host='localhost', manager_port=5001):
@@ -51,23 +52,48 @@ class Client:
         """Listen for messages from the manager server."""
         try:
             while self.running:
-                data = self.socket.recv(1024).decode('utf-8')
-                if not data:
-                    print("Connection to manager server lost")
-                    self.running = False
-                    break
-                
                 try:
-                    message = json.loads(data)
-                    print(f"Received from manager: {message}")
-                except json.JSONDecodeError:
-                    print(f"Received invalid JSON from manager")
+                    # Set a timeout so we can check self.running periodically
+                    self.socket.settimeout(1.0)
+                    try:
+                        data = self.socket.recv(1024).decode('utf-8')
+                        if not data:
+                            if self.running:
+                                print("Connection to manager server lost")
+                                self.running = False
+                            break
+                        
+                        try:
+                            message = json.loads(data)
+                            print(f"Received from manager: {message}")
+                            
+                            # Handle close_client command
+                            if message.get('type') == 'close_client':
+                                reason = message.get('reason', 'Requested by server')
+                                print(f"\nReceived shutdown command: {reason}")
+                                self.running = False
+                                # Send acknowledgment
+                                self.send_message('close_ack', {'status': 'shutting_down'})
+                                time.sleep(1)  # Give a moment for the message to be sent
+                                print("Client shutting down...")
+                                break
+                                
+                        except json.JSONDecodeError:
+                            print(f"Received invalid JSON from manager")
+                            
+                    except socket.timeout:
+                        continue
+                        
+                except Exception as e:
+                    if self.running:  # Only print error if we're not shutting down
+                        print(f"Error receiving messages: {e}")
+                    break
                     
         except Exception as e:
-            print(f"Error receiving messages: {e}")
-            self.running = False
+            if self.running:  # Only print error if we're not shutting down
+                print(f"Error in receive_messages: {e}")
         finally:
-            self.socket.close()
+            self.shutdown()
     
     def send_message(self, message_type, content=None):
         """Send a message to the manager server."""
@@ -91,6 +117,18 @@ class Client:
             print(f"Error sending message: {e}")
             self.running = False
             return False
+    
+    def shutdown(self):
+        """Perform cleanup and shutdown the client."""
+        if not hasattr(self, 'socket') or self.socket is None:
+            return
+            
+        try:
+            self.running = False
+            self.socket.close()
+            self.socket = None
+        except Exception as e:
+            print(f"Error during shutdown: {e}")
     
     def start(self):
         """Start the client and begin communication with the manager."""
@@ -128,11 +166,11 @@ class Client:
                     print("Invalid choice")
                     
         except KeyboardInterrupt:
-            print("\nClient shutting down...")
+            print("\nClient shutting down due to keyboard interrupt...")
         finally:
             self.running = False
-            if self.socket:
-                self.socket.close()
+            self.shutdown()
+            sys.exit(0)
     
     def send_heartbeat(self):
         """Send a heartbeat to the manager server."""
