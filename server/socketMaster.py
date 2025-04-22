@@ -3,7 +3,8 @@ import threading
 import json
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
+
 
 class MasterServer:
     def __init__(self, host='0.0.0.0', port=5000):
