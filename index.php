@@ -1,5 +1,6 @@
 <?php
-    $numBoxes = file_get_contents('http://localhost:3753/getNum');
+    // $numBoxes = file_get_contents('http://localhost:3753/getNum');
+    $numBoxes = file_get_contents('http://evolab:3753/getNum');
     $numBoxes = is_numeric($numBoxes) ? (int)$numBoxes : 10; // Fallback to 10 if invalid
     
     // Pagination setup
@@ -55,16 +56,18 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            position: relative;
         }
 
         .boxes-container {
             display: flex;
             flex-wrap: wrap;
             padding: 20px;
-            gap: 15px;
+            gap: 10px;
             align-content: flex-start;
             overflow-y: auto;
             flex: 1;
+            padding-bottom: 80px; /* Make room for the fixed pagination */
         }
 
         .pagination-container {
@@ -74,16 +77,21 @@
             justify-content: center;
             align-items: center;
             border-top: 1px solid #ddd;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 87.5%; /* Match the width of the left container */
+            z-index: 100;
         }
 
         .experiment-box {
-            width: 120px;
-            height: 120px;
+            width: 100px;
+            height: 100px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 16px;
+            font-size: 14px;
             flex-direction: column;
             border-radius: var(--border-radius);
             cursor: pointer;
@@ -111,7 +119,7 @@
         }
 
         .experiment-box .status-icon {
-            font-size: 24px;
+            font-size: 20px;
             margin-bottom: 5px;
         }
 
@@ -236,7 +244,7 @@
         }
 
         .page-jump input {
-            width: 60px;
+            width: 100px; /* Increased from 60px */
             height: 36px;
             border: 1px solid #ddd;
             border-radius: 5px;
@@ -292,6 +300,10 @@
             .right {
                 width: 25%;
             }
+            
+            .pagination-container {
+                width: 75%;
+            }
         }
 
         @media (max-width: 768px) {
@@ -319,6 +331,11 @@
                 width: 100%;
                 justify-content: center;
                 margin-top: 10px;
+            }
+            
+            .pagination-container {
+                position: static;
+                width: 100%;
             }
         }
     </style>
@@ -412,7 +429,8 @@
         }
         
         function fetchLogs() {
-            const serverUrl = "http://" + window.location.hostname + ":3753/logs";
+            // const serverUrl = "http://" + window.location.hostname + ":3753/logs";
+            const serverUrl = "http://evolab:3753/logs";
             const headers = {
                 'lastLog': lastLog
             };
@@ -433,7 +451,8 @@
         }
         
         function fetchStates() {
-            const serverUrl = "http://" + window.location.hostname + ":3753/status";
+            // const serverUrl = "http://" + window.location.hostname + ":3753/status";
+            const serverUrl = "http://evolab:3753/status";
             const headers = {
                 'lastLog': lastState
             };
@@ -444,7 +463,7 @@
             })
             .then(response => response.json())
             .then(data => {
-                console.log("States received:", data);
+                // console.log("States received:", data);
                 changeStates(data);
             })
             .catch(error => {
@@ -455,7 +474,7 @@
         
         function changeStates(states) {
             states.forEach(state => {
-                console.log("Updating ID " + state.index);
+                // console.log("Updating ID " + state.index);
                 changeBox(state);
                 lastState = state.ID;
             });
@@ -491,7 +510,8 @@
         }
         
         function redbox(boxNumber) {
-            const serverUrl = "http://" + window.location.hostname + ":3753/info";
+            // const serverUrl = "http://" + window.location.hostname + ":3753/info";
+            const serverUrl = "http://evolab:3753/info";
             const headers = {
                 'index': boxNumber
             };
@@ -502,7 +522,7 @@
             })
             .then(response => response.json())
             .then(data => {
-                console.log("Box info received:", data);
+                // console.log("Box info received:", data);
 
                 const width = 600;
                 const height = 400;
@@ -595,7 +615,7 @@
         
         window.onload = function() {
             fetchAll();
-            setInterval(fetchAll, 500);  // Poll every 500ms
+            setInterval(fetchAll, 2000);  // Poll every 500ms
         }
     </script>
 </body>
