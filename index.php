@@ -1,14 +1,3 @@
-<?php
-    $numBoxes = file_get_contents('http://localhost:3753/getNum');
-    $numBoxes = is_numeric($numBoxes) ? (int)$numBoxes : 10; // Fallback to 10 if invalid
-    
-    // Pagination setup
-    $boxesPerPage = 100;
-    $totalPages = ceil($numBoxes / $boxesPerPage);
-    $currentPage = isset($_GET['page']) ? max(1, min($totalPages, (int)$_GET['page'])) : 1;
-    $startBox = ($currentPage - 1) * $boxesPerPage + 1;
-    $endBox = min($startBox + $boxesPerPage - 1, $numBoxes);
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -55,16 +44,18 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            position: relative;
         }
 
         .boxes-container {
             display: flex;
             flex-wrap: wrap;
             padding: 20px;
-            gap: 15px;
+            gap: 10px;
             align-content: flex-start;
             overflow-y: auto;
             flex: 1;
+            padding-bottom: 80px; /* Make room for the fixed pagination */
         }
 
         .pagination-container {
@@ -74,16 +65,21 @@
             justify-content: center;
             align-items: center;
             border-top: 1px solid #ddd;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 87.5%; /* Match the width of the left container */
+            z-index: 100;
         }
 
         .experiment-box {
-            width: 120px;
-            height: 120px;
+            width: 100px;
+            height: 100px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 16px;
+            font-size: 14px;
             flex-direction: column;
             border-radius: var(--border-radius);
             cursor: pointer;
@@ -111,7 +107,7 @@
         }
 
         .experiment-box .status-icon {
-            font-size: 24px;
+            font-size: 20px;
             margin-bottom: 5px;
         }
 
@@ -236,7 +232,7 @@
         }
 
         .page-jump input {
-            width: 60px;
+            width: 100px; /* Increased from 60px */
             height: 36px;
             border: 1px solid #ddd;
             border-radius: 5px;
@@ -263,6 +259,44 @@
         .page-info {
             color: #666;
             margin-right: 15px;
+        }
+
+        /* Server IP Settings */
+        .server-settings {
+            display: flex;
+            align-items: center;
+            margin-left: 20px;
+            padding-left: 20px;
+            border-left: 1px solid #ddd;
+        }
+
+        .server-settings input {
+            width: 150px;
+            height: 36px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 0 10px;
+            margin: 0 5px;
+        }
+
+        .server-settings button {
+            height: 36px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 0 15px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .server-settings button:hover {
+            background-color: #2980b9;
+        }
+
+        .server-ip-label {
+            color: #666;
+            font-weight: bold;
         }
 
         /* Custom scrollbar */
@@ -292,6 +326,19 @@
             .right {
                 width: 25%;
             }
+            
+            .pagination-container {
+                width: 75%;
+            }
+            
+            .server-settings {
+                margin-left: 10px;
+                padding-left: 10px;
+            }
+            
+            .server-settings input {
+                width: 120px;
+            }
         }
 
         @media (max-width: 768px) {
@@ -320,71 +367,47 @@
                 justify-content: center;
                 margin-top: 10px;
             }
+            
+            .pagination-container {
+                position: static;
+                width: 100%;
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .server-settings {
+                margin-left: 0;
+                padding-left: 0;
+                border-left: none;
+                border-top: 1px solid #ddd;
+                padding-top: 10px;
+                margin-top: 10px;
+                width: 100%;
+                justify-content: center;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="left">
-            <div class="boxes-container">
-                <?php for ($i = $startBox; $i <= $endBox; $i++): ?>
-                    <div class="experiment-box" id="box-<?php echo $i; ?>" onclick="redbox(<?php echo $i; ?>)">
-                        <div class="status-icon"><i class="fas fa-hourglass-half"></i></div>
-                        <div class="box-content"><?php echo $i; ?> is Waiting</div>
-                    </div>
-                <?php endfor; ?>
+            <div class="boxes-container" id="boxes-container">
+                <!-- Boxes will be generated via JavaScript -->
             </div>
             
-            <?php if ($numBoxes > $boxesPerPage): ?>
             <div class="pagination-container">
-                <div class="page-info">
-                    Showing boxes <?php echo $startBox; ?> to <?php echo $endBox; ?> of <?php echo $numBoxes; ?>
+                <div class="page-info" id="page-info">
+                    Loading experiment data...
                 </div>
-                <div class="pagination">
-                    <?php
-                    // Previous button
-                    $prevDisabled = $currentPage <= 1 ? 'disabled' : '';
-                    $prevPage = max(1, $currentPage - 1);
-                    echo "<a href='?page={$prevPage}' class='page-link {$prevDisabled}'><i class='fas fa-chevron-left'></i></a>";
-                    
-                    // Page numbers
-                    $startPageButton = max(1, $currentPage - 2);
-                    $endPageButton = min($totalPages, $startPageButton + 4);
-                    
-                    if ($startPageButton > 1) {
-                        echo "<a href='?page=1' class='page-link'>1</a>";
-                        if ($startPageButton > 2) {
-                            echo "<span class='page-link disabled'>...</span>";
-                        }
-                    }
-                    
-                    for ($p = $startPageButton; $p <= $endPageButton; $p++) {
-                        $activeClass = $p == $currentPage ? 'active' : '';
-                        echo "<a href='?page={$p}' class='page-link {$activeClass}'>{$p}</a>";
-                    }
-                    
-                    if ($endPageButton < $totalPages) {
-                        if ($endPageButton < $totalPages - 1) {
-                            echo "<span class='page-link disabled'>...</span>";
-                        }
-                        echo "<a href='?page={$totalPages}' class='page-link'>{$totalPages}</a>";
-                    }
-                    
-                    // Next button
-                    $nextDisabled = $currentPage >= $totalPages ? 'disabled' : '';
-                    $nextPage = min($totalPages, $currentPage + 1);
-                    echo "<a href='?page={$nextPage}' class='page-link {$nextDisabled}'><i class='fas fa-chevron-right'></i></a>";
-                    ?>
-                    
-                    <div class="page-jump">
-                        <form id="jumpToPageForm" onsubmit="return jumpToPage()">
-                            <input type="number" id="pageInput" min="1" max="<?php echo $totalPages; ?>" placeholder="Page">
-                            <button type="submit">Go</button>
-                        </form>
-                    </div>
+                <div class="pagination" id="pagination">
+                    <!-- Pagination will be generated via JavaScript -->
+                </div>
+                <div class="server-settings">
+                    <span class="server-ip-label">Server IP:</span>
+                    <input type="text" id="serverIpInput" placeholder="Server IP">
+                    <button onclick="updateServerIp()">Update</button>
                 </div>
             </div>
-            <?php endif; ?>
         </div>
         
         <div class="right">
@@ -402,9 +425,247 @@
     <script>
         let lastLog = -1;
         let lastState = -1;
-        let currentPage = <?php echo $currentPage; ?>;
-        let boxesPerPage = <?php echo $boxesPerPage; ?>;
-        let totalPages = <?php echo $totalPages; ?>;
+        let currentPage = 1;
+        let boxesPerPage = 100;
+        let totalPages = 1;
+        let numBoxes = 10; // Default value
+        let serverIp = localStorage.getItem('serverIp') || 'evolab'; // Default to evolab if not set
+        
+        // Initialize the server IP input field
+        document.getElementById('serverIpInput').value = serverIp;
+        
+        function updateServerIp() {
+            const newIp = document.getElementById('serverIpInput').value.trim();
+            if (newIp) {
+                serverIp = newIp;
+                localStorage.setItem('serverIp', serverIp);
+                showNotification(`Server IP updated to ${serverIp}`);
+                loadInitialData(); // Reload data with new IP
+            } else {
+                showErrorAnnouncement("Please enter a valid server IP");
+            }
+        }
+        
+        function showNotification(message) {
+            const announcements = document.getElementById("announcements");
+            const announcement = document.createElement("div");
+            announcement.classList.add("announcement");
+            announcement.style.borderLeft = "4px solid #2ecc71";
+            
+            const messageEl = document.createElement("div");
+            messageEl.className = "message";
+            messageEl.textContent = message;
+            
+            const time = document.createElement("div");
+            time.className = "time";
+            time.textContent = new Date().toLocaleTimeString();
+            
+            announcement.appendChild(messageEl);
+            announcement.appendChild(time);
+            
+            announcements.prepend(announcement);
+            setTimeout(() => announcement.style.opacity = 1, 50);
+        }
+        
+        function getUrlParam(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+        
+        function loadInitialData() {
+            // Get page from URL or default to 1
+            currentPage = parseInt(getUrlParam('page')) || 1;
+            
+            // Fetch the number of boxes first
+            fetch(`http://${serverIp}:3753/getNum`)
+                .then(response => response.text())
+                .then(data => {
+                    numBoxes = parseInt(data);
+                    if (isNaN(numBoxes)) numBoxes = 10; // Fallback to 10 if invalid
+                    
+                    totalPages = Math.ceil(numBoxes / boxesPerPage);
+                    currentPage = Math.max(1, Math.min(totalPages, currentPage)); // Ensure valid page
+                    
+                    updatePagination();
+                    generateBoxes();
+                    fetchAll();
+                })
+                .catch(error => {
+                    console.error("Error fetching box count:", error);
+                    showErrorAnnouncement(`Failed to connect to server at ${serverIp}:3753`);
+                    // Still generate UI with default values
+                    updatePagination();
+                    generateBoxes();
+                });
+        }
+        
+        function generateBoxes() {
+            const container = document.getElementById('boxes-container');
+            container.innerHTML = ''; // Clear existing boxes
+            
+            // Calculate start and end box indices
+            const startBox = (currentPage - 1) * boxesPerPage + 1;
+            const endBox = Math.min(startBox + boxesPerPage - 1, numBoxes);
+            
+            // Update page info
+            document.getElementById('page-info').textContent = `Showing boxes ${startBox} to ${endBox} of ${numBoxes}`;
+            
+            // Generate boxes
+            for (let i = startBox; i <= endBox; i++) {
+                const box = document.createElement('div');
+                box.className = 'experiment-box';
+                box.id = `box-${i}`;
+                box.onclick = () => redbox(i);
+                
+                const statusIcon = document.createElement('div');
+                statusIcon.className = 'status-icon';
+                statusIcon.innerHTML = '<i class="fas fa-hourglass-half"></i>';
+                
+                const boxContent = document.createElement('div');
+                boxContent.className = 'box-content';
+                boxContent.textContent = `${i} is Waiting`;
+                
+                box.appendChild(statusIcon);
+                box.appendChild(boxContent);
+                
+                container.appendChild(box);
+            }
+        }
+        
+        function updatePagination() {
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = ''; // Clear existing pagination
+            
+            if (numBoxes <= boxesPerPage) {
+                return; // No pagination needed
+            }
+            
+            // Previous button
+            const prevDisabled = currentPage <= 1 ? 'disabled' : '';
+            const prevPage = Math.max(1, currentPage - 1);
+            const prevLink = document.createElement('a');
+            prevLink.href = `?page=${prevPage}`;
+            prevLink.className = `page-link ${prevDisabled}`;
+            prevLink.innerHTML = '<i class="fas fa-chevron-left"></i>';
+            if (!prevDisabled) {
+                prevLink.onclick = (e) => {
+                    e.preventDefault();
+                    navigateToPage(prevPage);
+                };
+            }
+            pagination.appendChild(prevLink);
+            
+            // Page numbers
+            const startPageButton = Math.max(1, currentPage - 2);
+            const endPageButton = Math.min(totalPages, startPageButton + 4);
+            
+            if (startPageButton > 1) {
+                const firstPageLink = document.createElement('a');
+                firstPageLink.href = '?page=1';
+                firstPageLink.className = 'page-link';
+                firstPageLink.textContent = '1';
+                firstPageLink.onclick = (e) => {
+                    e.preventDefault();
+                    navigateToPage(1);
+                };
+                pagination.appendChild(firstPageLink);
+                
+                if (startPageButton > 2) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.className = 'page-link disabled';
+                    ellipsis.textContent = '...';
+                    pagination.appendChild(ellipsis);
+                }
+            }
+            
+            for (let p = startPageButton; p <= endPageButton; p++) {
+                const activeClass = p == currentPage ? 'active' : '';
+                const pageLink = document.createElement('a');
+                pageLink.href = `?page=${p}`;
+                pageLink.className = `page-link ${activeClass}`;
+                pageLink.textContent = p;
+                if (p != currentPage) {
+                    pageLink.onclick = (e) => {
+                        e.preventDefault();
+                        navigateToPage(p);
+                    };
+                }
+                pagination.appendChild(pageLink);
+            }
+            
+            if (endPageButton < totalPages) {
+                if (endPageButton < totalPages - 1) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.className = 'page-link disabled';
+                    ellipsis.textContent = '...';
+                    pagination.appendChild(ellipsis);
+                }
+                
+                const lastPageLink = document.createElement('a');
+                lastPageLink.href = `?page=${totalPages}`;
+                lastPageLink.className = 'page-link';
+                lastPageLink.textContent = totalPages;
+                lastPageLink.onclick = (e) => {
+                    e.preventDefault();
+                    navigateToPage(totalPages);
+                };
+                pagination.appendChild(lastPageLink);
+            }
+            
+            // Next button
+            const nextDisabled = currentPage >= totalPages ? 'disabled' : '';
+            const nextPage = Math.min(totalPages, currentPage + 1);
+            const nextLink = document.createElement('a');
+            nextLink.href = `?page=${nextPage}`;
+            nextLink.className = `page-link ${nextDisabled}`;
+            nextLink.innerHTML = '<i class="fas fa-chevron-right"></i>';
+            if (!nextDisabled) {
+                nextLink.onclick = (e) => {
+                    e.preventDefault();
+                    navigateToPage(nextPage);
+                };
+            }
+            pagination.appendChild(nextLink);
+            
+            // Page jump form
+            const pageJump = document.createElement('div');
+            pageJump.className = 'page-jump';
+            
+            const jumpForm = document.createElement('form');
+            jumpForm.id = 'jumpToPageForm';
+            jumpForm.onsubmit = (e) => {
+                e.preventDefault();
+                return jumpToPage();
+            };
+            
+            const pageInput = document.createElement('input');
+            pageInput.type = 'number';
+            pageInput.id = 'pageInput';
+            pageInput.min = '1';
+            pageInput.max = totalPages;
+            pageInput.placeholder = 'Page';
+            
+            const goButton = document.createElement('button');
+            goButton.type = 'submit';
+            goButton.textContent = 'Go';
+            
+            jumpForm.appendChild(pageInput);
+            jumpForm.appendChild(goButton);
+            pageJump.appendChild(jumpForm);
+            
+            pagination.appendChild(pageJump);
+        }
+        
+        function navigateToPage(page) {
+            currentPage = page;
+            // Update URL without reload
+            window.history.pushState({}, '', `?page=${page}`);
+            // Update UI
+            generateBoxes();
+            updatePagination();
+            // Fetch new data
+            fetchAll();
+        }
         
         function fetchAll() {
             fetchLogs();
@@ -412,7 +673,7 @@
         }
         
         function fetchLogs() {
-            const serverUrl = "http://" + window.location.hostname + ":3753/logs";
+            const serverUrl = `http://${serverIp}:3753/logs`;
             const headers = {
                 'lastLog': lastLog
             };
@@ -433,7 +694,7 @@
         }
         
         function fetchStates() {
-            const serverUrl = "http://" + window.location.hostname + ":3753/status";
+            const serverUrl = `http://${serverIp}:3753/status`;
             const headers = {
                 'lastLog': lastState
             };
@@ -444,7 +705,6 @@
             })
             .then(response => response.json())
             .then(data => {
-                console.log("States received:", data);
                 changeStates(data);
             })
             .catch(error => {
@@ -455,7 +715,6 @@
         
         function changeStates(states) {
             states.forEach(state => {
-                console.log("Updating ID " + state.index);
                 changeBox(state);
                 lastState = state.ID;
             });
@@ -491,7 +750,7 @@
         }
         
         function redbox(boxNumber) {
-            const serverUrl = "http://" + window.location.hostname + ":3753/info";
+            const serverUrl = `http://${serverIp}:3753/info`;
             const headers = {
                 'index': boxNumber
             };
@@ -502,8 +761,6 @@
             })
             .then(response => response.json())
             .then(data => {
-                console.log("Box info received:", data);
-
                 const width = 600;
                 const height = 400;
 
@@ -585,7 +842,7 @@
             const page = parseInt(pageInput.value);
             
             if (page >= 1 && page <= totalPages) {
-                window.location.href = `?page=${page}`;
+                navigateToPage(page);
             } else {
                 showErrorAnnouncement(`Please enter a page number between 1 and ${totalPages}`);
             }
@@ -593,9 +850,20 @@
             return false; // Prevent form submission
         }
         
+        // Handle browser back/forward buttons
+        window.onpopstate = function() {
+            const pageParam = getUrlParam('page');
+            if (pageParam) {
+                currentPage = parseInt(pageParam);
+                generateBoxes();
+                updatePagination();
+                fetchAll();
+            }
+        };
+        
         window.onload = function() {
-            fetchAll();
-            setInterval(fetchAll, 500);  // Poll every 500ms
+            loadInitialData();
+            setInterval(fetchAll, 2000);  // Poll every 2 seconds
         }
     </script>
 </body>
