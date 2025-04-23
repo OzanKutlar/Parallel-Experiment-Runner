@@ -99,7 +99,7 @@ class SocketServer:
         self.manager_list.append({'id': client_id, 'address': addr})
         
         # Send the generated client ID back to the client
-        client_socket.send(json.dumps({'client_id': client_id}).encode('utf-8'))
+        client_socket.send(json.dumps({'manager_id': client_id}).encode('utf-8'))
 
         try:
             while True:
@@ -109,12 +109,12 @@ class SocketServer:
                 try:
                     message = json.loads(data)
                     
-                    response = {'status': 'ok', 'received': message, 'client_id': client_id}
+                    response = {'status': 'ok', 'received': message, 'client_id': message['client_id']}
                     
                     if('req' in message):
                         request = message['req']
                         if(request == 'get'):
-                            response = {'status': 'ok', 'data': experimenter.getExperiment("-1", str(client_id)), 'client_id': client_id}
+                            response = {'status': 'ok', 'data': experimenter.getExperiment("-1", str(message['client_id'])), 'client_id': message['client_id']}
                         
                     
                     # print(f"Received from client {client_id} ({addr}): {message}")
