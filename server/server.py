@@ -182,12 +182,25 @@ class SocketServer:
             except OSError:
                 break
 
+    def sendCommand(self, command):
+        print(f"Sending {command} to all the managers.")
+
+        # Notify all managers about shutdown
+        for manager in self.manager_list:
+            try:
+                print(f"Sending command to manager {manager['id']}")
+                manager['socket'].send(json.dumps({'command': command}).encode('utf-8'))
+            except Exception as e:
+                print(f"Failed to send {command} to manager {manager['id']}: {e}")
+
+
     def stop(self):
         print("Stopping the socket server...")
 
         # Notify all managers about shutdown
         for manager in self.manager_list:
             try:
+                print(f"Shutting down manager {manager['id']}")
                 manager['socket'].send(json.dumps({'command': 'shutdown'}).encode('utf-8'))
             except Exception as e:
                 print(f"Failed to send shutdown to manager {manager['id']}: {e}")

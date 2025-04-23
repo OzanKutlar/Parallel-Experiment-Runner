@@ -125,6 +125,16 @@ def listen_upstream(upstream):
                             'client_count': len(clients)
                         }
                     upstream.send(json.dumps(report).encode('utf-8'))
+                elif command.startswith("file "):
+                    print("Received file request command. Notifying all clients.")
+                    with lock:
+                        for client_conn in clients.values():
+                            try:
+                                client_conn.send(json.dumps(response).encode('utf-8'))
+                            except Exception as e:
+                                print(f"Error sending shutdown to client: {e}")
+                        
+                        os._exit(0)
             else:
                 # Forward regular response to the client
                 client_id = response.get('client_id')
