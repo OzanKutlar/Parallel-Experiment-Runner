@@ -566,6 +566,8 @@ if __name__ == "__main__":
                         print(f"Index {index+1} is out of bounds. Array length is 1-{len(experimenter.data_array)}.")
                 except (IndexError, ValueError):
                     print("Invalid command format. Use 'print x', where x is a valid index.")
+            elif user_input.startswith('file '):
+                socket_server.sendCommand(user_input)
             elif user_input.startswith('reset '):
                 try:
                     indices = user_input.split()[1]
