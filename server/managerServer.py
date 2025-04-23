@@ -65,7 +65,7 @@ def handle_client_connection(conn, addr, client_id):
                     data, buffer = buffer.split('\n', 1)
                     break
 
-            message = json.loads(data.decode('utf-8'))
+            message = json.loads(data)
             
             if message.get("type") == "heartbeat":
                 continue  # Just ignore and wait for the next real message
@@ -187,7 +187,7 @@ def send_to_upstream():
             message = request_queue.get()
             message['manager_id'] = manager_id
             try:
-                upstream.send(json.dumps(message).encode('utf-8'))
+                upstream.send((json.dumps(message) + "\n").encode('utf-8'))
             except Exception as e:
                 print(f"Error sending to upstream: {e}")
             request_queue.task_done()
