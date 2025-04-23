@@ -76,7 +76,7 @@ experimenter = Experimenter()
 
 
 class SocketServer:
-    def __init__(self, host='127.0.0.1', port=65432):
+    def __init__(self, host='0.0.0.0', port=65432):
         self.host = host
         self.port = port
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
