@@ -154,6 +154,26 @@ def force_shutdown():
     os._exit(0)  # Immediately terminates the process
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Manager Server for Distributed Computing')
+    parser.add_argument('--master-host', default='localhost', 
+                        help='Master server hostname')
+    parser.add_argument('--master-port', type=int, default=65432, 
+                        help='Master server port')
+    parser.add_argument('--host', default='0.0.0.0', 
+                        help='Manager server hostname')
+    parser.add_argument('--port', type=int, default=65431, 
+                        help='Manager server port')
+    
+
+    args = parser.parse_args()
+
+    HOST = args.host
+    PORT = args.port
+    
+    UPSTREAM_HOST = args.master-host
+    UPSTREAM_PORT = args.master-port
+
     # Start the thread that listens for local clients
     threading.Thread(target=listen_for_clients, daemon=True).start()
 
