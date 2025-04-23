@@ -75,6 +75,61 @@ class Experimenter:
 experimenter = Experimenter()
 
 
+class SocketServer:
+    def __init__(self, host='127.0.0.1', port=65432):
+        self.host = host
+        self.port = port
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen()
+        self.running = False
+        self.threads = []
+
+    def handle_client(self, client_socket, addr):
+        print(f"Connection from {addr}")
+        try:
+            while True:
+                data = client_socket.recv(1024).decode('utf-8')
+                if not data:
+                    break
+                try:
+                    message = json.loads(data)
+                    print(f"Received from {addr}: {message}")
+                    response = {'status': 'ok', 'received': message}
+                    client_socket.send(json.dumps(response).encode('utf-8'))
+                except json.JSONDecodeError:
+                    client_socket.send(json.dumps({'error': 'Invalid JSON'}).encode('utf-8'))
+        finally:
+            client_socket.close()
+            print(f"Connection closed with {addr}")
+
+    def start(self):
+        self.running = True
+        print(f"Socket Server listening on {self.host}:{self.port}")
+        while self.running:
+            try:
+                client_socket, addr = self.server_socket.accept()
+                thread = threading.Thread(target=self.handle_client, args=(client_socket, addr), daemon=True)
+                thread.start()
+                self.threads.append(thread)
+            except OSError:
+                break  # Will happen when the socket is closed or interrupted.
+
+    def stop(self):
+        print("Stopping the socket server...")
+        self.running = False
+        self.server_socket.close()
+        for thread in self.threads:
+            thread.join(timeout=1)
+        print("Socket Server stopped.")
+
+    def run_in_background(self):
+        """Run the server in a separate thread"""
+        server_thread = threading.Thread(target=self.start, daemon=True)
+        server_thread.start()
+
+
 
 RED = "\033[31m"
 GREEN = "\033[32m"
@@ -402,16 +457,16 @@ if __name__ == "__main__":
 
     server_thread = threading.Thread(target=start_server, args=(server,), daemon=True)
     server_thread.start()
+    
+    socket_server = SocketServer()
+    
+    socket_server.run_in_background()
 
     try:
         while True:
             user_input = input()
             if user_input.lower() == 'quit':
                 print("Shutting down the server...")
-                server.shutdown()
-                server.server_close()
-                server_thread.join()
-                print("Server stopped.")
                 break
             elif user_input.startswith('print '):
                 try:
@@ -448,9 +503,12 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt detected. Shutting down the server...")
+        
+    finally:
         server.shutdown()
         server.server_close()
         server_thread.join()
+        socket_server.stop()
         print("Server stopped.")
 
 
