@@ -12,6 +12,22 @@ from socketMaster import MasterServer
 host = "0.0.0.0"
 port = 3753
 
+class Experimenter:
+    # Holds all the combined experiments
+    data_array = []
+    
+    
+    def add_exp(experiment):
+        data_array.append({
+            "data": experiment,
+            "completed": False,
+            "givenToPC": "Admin",
+        })
+    
+    
+    
+
+
 
 data_array = []
 completed_array = []
