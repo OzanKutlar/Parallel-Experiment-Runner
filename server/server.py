@@ -109,6 +109,9 @@ class SocketServer:
                     break
                 try:
                     message = json.loads(data)
+                    
+                    if message.get("type") == "heartbeat":
+                        continue  # Just ignore and wait for the next real message
 
                     response = {'status': 'ok', 'received': message, 'client_id': message['client_id']}
 

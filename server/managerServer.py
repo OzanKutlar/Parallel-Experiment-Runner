@@ -3,6 +3,7 @@ import json
 import threading
 import queue
 import os
+import argparse
 
 HOST = '0.0.0.0'      # Where this proxy server will listen
 PORT = 65431            # Port for the local clients to connect
@@ -16,6 +17,32 @@ request_queue = queue.Queue()
 response_event = threading.Event()
 
 lock = threading.Lock()
+
+HEARTBEAT_INTERVAL = 10
+
+def heartbeat_thread(upstream_socket):
+    while True:
+        time.sleep(HEARTBEAT_INTERVAL)
+        
+        # Send heartbeat to upstream
+        try:
+            heartbeat_msg = json.dumps({"type": "heartbeat", "manager_id": manager_id}).encode('utf-8')
+            upstream_socket.send(heartbeat_msg)
+        except Exception as e:
+            print(f"[Heartbeat] Failed to send to upstream: {e}")
+        
+        # Send heartbeat to all clients
+        with lock:
+            for client_id, conn in list(clients.items()):
+                try:
+                    heartbeat = json.dumps({"type": "heartbeat"}).encode('utf-8')
+                    conn.send(heartbeat)
+                except Exception as e:
+                    print(f"[Heartbeat] Failed to send to client {client_id}: {e}")
+                    conn.close()
+                    clients.pop(client_id, None)
+
+
 
 def handle_client_connection(conn, addr, client_id):
     print(f"Client {client_id} connected from {addr}")
@@ -31,6 +58,10 @@ def handle_client_connection(conn, addr, client_id):
                 break
 
             message = json.loads(data.decode('utf-8'))
+            
+            if message.get("type") == "heartbeat":
+                continue  # Just ignore and wait for the next real message
+            
             message['client_id'] = client_id  # Ensure client_id is present
 
             # Add the message to the queue
@@ -69,6 +100,9 @@ def listen_upstream(upstream):
                 break
 
             response = json.loads(data.decode('utf-8'))
+            
+            if response.get("type") == "heartbeat":
+                continue  # Just log or ignore
 
             if 'command' in response:
                 command = response['command']
@@ -106,6 +140,7 @@ def listen_upstream(upstream):
 
 
 def send_to_upstream():
+    global manager_id
     upstream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     upstream.connect((UPSTREAM_HOST, UPSTREAM_PORT))
     
@@ -124,8 +159,10 @@ def send_to_upstream():
 
     print(f"Connected to upstream server at {UPSTREAM_HOST}:{UPSTREAM_PORT}")
 
-    # Start listener thread for upstream messages
     threading.Thread(target=listen_upstream, args=(upstream,), daemon=True).start()
+
+    # Start heartbeat thread
+    threading.Thread(target=heartbeat_thread, args=(upstream,), daemon=True).start()
 
     while True:
         response_event.wait()
@@ -138,6 +175,7 @@ def send_to_upstream():
                 print(f"Error sending to upstream: {e}")
             request_queue.task_done()
         response_event.clear()
+
 
 
 def force_shutdown():
@@ -171,8 +209,8 @@ if __name__ == "__main__":
     HOST = args.host
     PORT = args.port
     
-    UPSTREAM_HOST = args.master-host
-    UPSTREAM_PORT = args.master-port
+    UPSTREAM_HOST = args.master_host
+    UPSTREAM_PORT = args.master_port
 
     # Start the thread that listens for local clients
     threading.Thread(target=listen_for_clients, daemon=True).start()
