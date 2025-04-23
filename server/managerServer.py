@@ -21,7 +21,10 @@ lock = threading.Lock()
 
 HEARTBEAT_INTERVAL = 10
 PENDING_MESSAGES = {}  # client_id -> (message, timestamp)
-RETRY_INTERVAL = 5     # seconds
+RETRY_INTERVAL = 1     # seconds
+
+def sendUpstream(obj, upstream_socket):
+    upstream_socket.send((json.dumps(obj) + "\n").encode('utf-8'))
 
 def retry_unacknowledged_messages(upstream_socket):
     while True:
@@ -32,7 +35,7 @@ def retry_unacknowledged_messages(upstream_socket):
                 if current_time - timestamp >= RETRY_INTERVAL:
                     try:
                         print(f"[Retry] Resending message from client {client_id}")
-                        upstream_socket.send((json.dumps(message) + "\n").encode('utf-8'))
+                        sendUpstream(message, upstream_socket)
                         PENDING_MESSAGES[client_id] = (message, current_time)
                     except Exception as e:
                         print(f"Failed to resend message for client {client_id}: {e}")
@@ -44,8 +47,8 @@ def heartbeat_thread(upstream_socket):
         
         # Send heartbeat to upstream
         try:
-            heartbeat_msg = json.dumps({"type": "heartbeat", "manager_id": manager_id}).encode('utf-8')
-            upstream_socket.send(heartbeat_msg)
+            heartbeat_msg = {"type": "heartbeat", "manager_id": manager_id}
+            sendUpstream(heartbeat_msg, upstream_socket)
         except Exception as e:
             print(f"[Heartbeat] Failed to send to upstream: {e}")
         
@@ -156,7 +159,7 @@ def listen_upstream(upstream):
                             'manager_id': response.get('manager_id'),  # use the one sent
                             'client_count': len(clients)
                         }
-                    upstream.send(json.dumps(report).encode('utf-8'))
+                    sendUpstream(report, upstream)
                 elif command.startswith("file "):
                     print("Received file request command. Notifying all clients.")
                     with lock:
@@ -209,7 +212,7 @@ def send_to_upstream():
         message = request_queue.get()
         message['manager_id'] = manager_id
         try:
-            upstream.send((json.dumps(message) + "\n").encode('utf-8'))
+            sendUpstream(message, upstream)
             with lock:
                 PENDING_MESSAGES[message['client_id']] = (message, time.time())
         except Exception as e:

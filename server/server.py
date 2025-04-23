@@ -92,12 +92,12 @@ class SocketServer:
     def handle_client(self, client_socket, addr):
         print(f"Connection from {addr}")
 
-        client_id = self.client_id_counter
+        manager_id = self.client_id_counter
         self.client_id_counter += 1
 
-        self.manager_list.append({'id': client_id, 'address': addr, 'socket': client_socket})
+        self.manager_list.append({'id': manager_id, 'address': addr, 'socket': client_socket, 'count': 0})
 
-        client_socket.send(json.dumps({'manager_id': client_id}).encode('utf-8'))
+        client_socket.send(json.dumps({'manager_id': manager_id}).encode('utf-8'))
 
         try:
             while True:
@@ -122,8 +122,16 @@ class SocketServer:
                     if message.get("type") == "heartbeat":
                         continue  # Just ignore and wait for the next real message
 
-                    response = {'status': 'ok', 'received': message, 'client_id': message['client_id']}
-
+                    response = {'status': 'ok', 'received': message}
+                    
+                    if 'client_id' in message:
+                        response['client_id'] = message['client_id']
+                    
+                    if 'client_count' in message:
+                        print(f"Manager {manager_id} has {message.get('client_count')} computers connected.")
+                        self.manager_list[manager_id - 1]['count'] = message.get('client_count')
+                        
+                    
                     if 'req' in message:
                         request = message['req']
                         if request == 'get':
@@ -176,9 +184,9 @@ class SocketServer:
                 except json.JSONDecodeError:
                     client_socket.send(json.dumps({'error': 'Invalid JSON'}).encode('utf-8'))
         finally:
-            self.manager_list = [client for client in self.manager_list if client['id'] != client_id]
+            self.manager_list = [client for client in self.manager_list if client['id'] != manager_id]
             client_socket.close()
-            print(f"Connection closed with client {client_id} ({addr})")
+            print(f"Connection closed with client {manager_id} ({addr})")
 
     def start(self):
         self.running = True
@@ -193,12 +201,12 @@ class SocketServer:
                 break
 
     def sendCommand(self, command):
-        print(f"Sending {command} to all the managers.")
+        print(f"Sending the command '{command}' to all the managers.")
 
         # Notify all managers about shutdown
         for manager in self.manager_list:
             try:
-                print(f"Sending command to manager {manager['id']}")
+                # print(f"Sending command to manager {manager['id']}")
                 manager['socket'].send(json.dumps({'command': command}).encode('utf-8'))
             except Exception as e:
                 print(f"Failed to send {command} to manager {manager['id']}: {e}")
@@ -577,6 +585,8 @@ if __name__ == "__main__":
                 except (IndexError, ValueError):
                     print("Invalid command format. Use 'print x', where x is a valid index.")
             elif user_input.startswith('file '):
+                socket_server.sendCommand(user_input)
+            elif user_input.startswith('report'):
                 socket_server.sendCommand(user_input)
             elif user_input.startswith('reset '):
                 try:

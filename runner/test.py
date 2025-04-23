@@ -8,6 +8,9 @@ import base64
 
 client_id = 0
 
+def sendUpstream(obj, upstream_socket):
+    upstream_socket.send((json.dumps(obj) + "\n").encode('utf-8'))
+
 def listen_to_server(sock):
     global client_id
     try:
@@ -37,7 +40,7 @@ def listen_to_server(sock):
                                 'filename': "file" + str(client_id),
                                 'file': file_content
                             }
-                            sock.send((json.dumps(file_response) + "\n").encode('utf-8'))
+                            sendUpstream(file_response, sock)
                             print(f"Sent file '{filename}' in base64 format.")
                         else:
                             print(f"File '{filename}' not found in current directory.")
@@ -64,7 +67,7 @@ def send_to_server(sock):
                 break
 
             request = {'req': msg, 'ComputerName': os.getenv('COMPUTERNAME')}
-            sock.send((json.dumps(request) + "\n").encode('utf-8'))
+            sendUpstream(request, sock)
     except Exception as e:
         print("Error in sending thread:", e)
         sock.close()
