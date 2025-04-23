@@ -85,45 +85,47 @@ class SocketServer:
         self.server_socket.listen()
         self.running = False
         self.threads = []
-        
-        
-        self.manager_list = []  # List of connected clients
-        self.client_id_counter = 1  # Counter for generating unique client IDs
+
+        self.manager_list = []  # List of connected managers: {'id', 'address', 'socket'}
+        self.client_id_counter = 1  # Counter for unique client IDs
 
     def handle_client(self, client_socket, addr):
         print(f"Connection from {addr}")
-        
-        # Generate a new client ID and assign it to the client
+
         client_id = self.client_id_counter
         self.client_id_counter += 1
-        self.manager_list.append({'id': client_id, 'address': addr})
-        
-        # Send the generated client ID back to the client
+
+        self.manager_list.append({'id': client_id, 'address': addr, 'socket': client_socket})
+
         client_socket.send(json.dumps({'manager_id': client_id}).encode('utf-8'))
 
         try:
             while True:
-                data = client_socket.recv(1024).decode('utf-8')
+                try:
+                    data = client_socket.recv(1024).decode('utf-8')
+                except ConnectionResetError:
+                    continue
                 if not data:
                     break
                 try:
                     message = json.loads(data)
-                    
+
                     response = {'status': 'ok', 'received': message, 'client_id': message['client_id']}
-                    
-                    if('req' in message):
+
+                    if 'req' in message:
                         request = message['req']
-                        if(request == 'get'):
-                            response = {'status': 'ok', 'data': experimenter.getExperiment("-1", str(message['client_id'])), 'client_id': message['client_id']}
-                        
-                    
-                    # print(f"Received from client {client_id} ({addr}): {message}")
-                    
+                        if request == 'get':
+                            response = {
+                                'status': 'ok',
+                                'data': experimenter.getExperiment("-1", str(message['client_id'])),
+                                'client_id': message['client_id']
+                            }
+
                     client_socket.send(json.dumps(response).encode('utf-8'))
+
                 except json.JSONDecodeError:
                     client_socket.send(json.dumps({'error': 'Invalid JSON'}).encode('utf-8'))
         finally:
-            # Remove the client from the manager list when they disconnect
             self.manager_list = [client for client in self.manager_list if client['id'] != client_id]
             client_socket.close()
             print(f"Connection closed with client {client_id} ({addr})")
@@ -138,20 +140,29 @@ class SocketServer:
                 thread.start()
                 self.threads.append(thread)
             except OSError:
-                break  # Will happen when the socket is closed or interrupted.
+                break
 
     def stop(self):
         print("Stopping the socket server...")
+
+        # Notify all managers about shutdown
+        for manager in self.manager_list:
+            try:
+                manager['socket'].send(json.dumps({'command': 'shutdown'}).encode('utf-8'))
+            except Exception as e:
+                print(f"Failed to send shutdown to manager {manager['id']}: {e}")
+
         self.running = False
         self.server_socket.close()
         for thread in self.threads:
             thread.join(timeout=1)
+
         print("Socket Server stopped.")
 
     def run_in_background(self):
-        """Run the server in a separate thread"""
         server_thread = threading.Thread(target=self.start, daemon=True)
         server_thread.start()
+
 
 
 
