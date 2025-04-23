@@ -123,6 +123,43 @@ class SocketServer:
                                 'data': experimenter.getExperiment("-1", str(message['ComputerName'])),
                                 'client_id': message['client_id']
                             }
+                    elif request == 'file':
+                        filename = message.get('filename')
+                        file_content_b64 = message.get('file')
+
+                        if filename and file_content_b64:
+                            try:
+                                # Decode the base64 content
+                                file_data = base64.b64decode(file_content_b64)
+                                
+                                # Save the file
+                                with open(filename, 'wb') as f:
+                                    f.write(file_data)
+
+                                response = {
+                                    'status': 'success',
+                                    'message': f"File '{filename}' saved successfully.",
+                                    'client_id': message.get('client_id', 'unknown')
+                                }
+                            except Exception as e:
+                                response = {
+                                    'status': 'error',
+                                    'message': f"Failed to save file '{filename}': {e}",
+                                    'client_id': message.get('client_id', 'unknown')
+                                }
+                        else:
+                            response = {
+                                'status': 'error',
+                                'message': 'Missing filename or file data.',
+                                'client_id': message.get('client_id', 'unknown')
+                            }
+
+                    else:
+                        response = {
+                            'status': 'error',
+                            'message': f"Unknown request: {request}",
+                            'client_id': message.get('client_id', 'unknown')
+                        }
 
                     client_socket.send(json.dumps(response).encode('utf-8'))
 

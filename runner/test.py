@@ -4,6 +4,9 @@ import argparse
 import threading
 import sys
 import os
+import base64
+
+client_id = 0
 
 def listen_to_server(sock):
     try:
@@ -15,11 +18,34 @@ def listen_to_server(sock):
 
             try:
                 response = json.loads(data)
-                if 'command' in response and response['command'] == 'shutdown':
-                    print("Received shutdown command. Exiting...")
-                    sock.close()
-                    os._exit(0)
-                print("Response from server:", response)
+                if 'command' in response:
+                    command = response['command']
+
+                    if command == 'shutdown':
+                        print("Received shutdown command. Exiting...")
+                        sock.close()
+                        os._exit(0)
+
+                    elif command.startswith('file '):
+                        filename = command[5:].strip()
+                        if os.path.isfile(filename):
+                            with open(filename, 'rb') as f:
+                                file_content = base64.b64encode(f.read()).decode('utf-8')
+                            file_response = {
+                                'req': 'file',
+                                'filename': "file" + str(client_id),
+                                'file': file_content
+                            }
+                            sock.send(json.dumps(file_response).encode('utf-8'))
+                            print(f"Sent file '{filename}' in base64 format.")
+                        else:
+                            print(f"File '{filename}' not found in current directory.")
+                    else:
+                        print("Unknown command:", command)
+
+                else:
+                    print("Response from server:", response)
+
             except json.JSONDecodeError:
                 print("Invalid JSON received.")
     except Exception as e:
