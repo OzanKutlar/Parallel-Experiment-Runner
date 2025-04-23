@@ -6,37 +6,75 @@ import sys
 import threading
 import base64
 import numpy as np
-from socketMaster import MasterServer
+import socket
 
 # Server settings
 host = "0.0.0.0"
 port = 3753
 
 class Experimenter:
-    # Holds all the combined experiments
-    data_array = []
+    def __init__(self):
+        self.data_array = []
+        self.completed_array = []
+        self.givenToPC = []
+        self.data_index = []
+        self.logs = []
+        self.stateLogs = []
+
+    def stateLog(self, newState, index, sentTo="Null"):
+        self.stateLogs.append({"state": newState, "index": index, "ID": len(self.stateLogs), "sentTo": sentTo})
     
+    def getExperiment(self, ID, computer_name):
+        last = self.data_index.pop()
+        
+        if not self.data_index:
+            self.data_index.append(last + 1)
+        if(ID != '-1'):
+            if(not self.completed_array[int(ID) - 1]):
+                self.stateLog("Reset", int(ID))
+                print(f"Resetting data {int(ID) + 1} for {computer_name} due to new request.")
+                self.log(f"Reset index {int(ID) + 1} by {computer_name}")
+                self.data_index.append(int(ID))
+                self.givenToPC[int(ID)] = 'Reset'
+                self.completed_array[int(ID)] = False
+                
+        if last < len(self.data_array):
+            response_data = self.data_array[last]
+            if last == len(self.givenToPC):
+                self.givenToPC.append(computer_name)
+            else:
+                self.givenToPC[last] = computer_name
+            if last == len(self.completed_array):
+                self.completed_array.append(False)
+            else:
+                self.completed_array[last] = False
+            self.stateLog("Running", last + 1, computer_name)
+            display_colored_array(self.data_array)
+            log(f"Sent Data on index {last + 1} to {computer_name}")
+            print(f"Data {last+1} has been sent to {computer_name}")
+        else:
+            response_data = {"message": "No more data left."}
+            self.log(f"Shutting down {computer_name}")
+            print(f'Data Distribution is finished. Extra connections : ', (last - len(self.data_array)))
+        
+        return response_data
     
-    def add_exp(experiment):
-        data_array.append({
-            "data": experiment,
-            "completed": False,
-            "givenToPC": "Admin",
-        })
-    
-    
-    
+    def complete(self, ID, computer_name):
+        self.stateLog("Finished", int(ID), computer_name)
+        print("ID " + ID + " is finished.")
+        self.completed_array[int(ID) - 1] = True
+
+    def reset(self, index):
+        self.stateLog("Reset", index + 1)
+        log(f"Reset index {index + 1} from terminal.")
+        self.data_index.append(index)
+        self.givenToPC[index] = 'Reset'
+        self.completed_array[index] = False
 
 
+experimenter = Experimenter()
 
-data_array = []
-completed_array = []
-givenToPC = []
 
-data_index = []
-
-logs = []
-stateLogs = []
 
 RED = "\033[31m"
 GREEN = "\033[32m"
@@ -52,56 +90,56 @@ COLUMN_DIST = 30
 
 def log(text):
     current_time = time.strftime('%Y-%m-%d %H:%M:%S')
-    logs.append({"Text": text, "ID": len(logs), "time": current_time})
+    experimenter.logs.append({"Text": text, "ID": len(experimenter.logs), "time": current_time})
 
     
-def stateLog(newState, index, sentTo="Null"):
-    stateLogs.append({"state": newState, "index": index, "ID": len(stateLogs), "sentTo": sentTo})
 
-class MyRequestHandler(BaseHTTPRequestHandler):
-    global data_index
+class HTTPHandler(BaseHTTPRequestHandler):
+    global experimenter
     
+    def log_message(self, format, *args):
+        pass  # This disables the default logging
     
     def do_GET(self):
-        global data_index
+        global experimenter
         
         if self.path == "/getNum":
-            # Send the length of data_array as a response
+            # Send the length of experimenter.data_array as a response
             self.send_response(200)
             self.send_header("Content-type", "text/plain")
             self.end_headers()
-            self.wfile.write(str(len(data_array)).encode())
+            self.wfile.write(str(len(experimenter.data_array)).encode())
             return
         
-        if self.path == "/logs":
-            last_log = int(self.headers.get('lastLog', len(logs) - 6))
+        if self.path == "/experimenter.logs":
+            last_log = int(self.headers.get('lastLog', len(experimenter.logs) - 6))
             # print(f"Request came for a log with lastlog : {last_log}")
-            if(last_log <= len(logs) - 6):
-                relevant_logs = logs[-5:]
+            if(last_log <= len(experimenter.logs) - 6):
+                relevant_experimenter.logs = experimenter.logs[-5:]
             else:
-                relevant_logs = logs[last_log+1:last_log+5]
+                relevant_experimenter.logs = experimenter.logs[last_log+1:last_log+5]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(relevant_logs).encode())
+            self.wfile.write(json.dumps(relevant_experimenter.logs).encode())
             return
             
         if self.path == "/status":
-            last_log = int(self.headers.get('lastLog', len(logs) - 6))
+            last_log = int(self.headers.get('lastLog', len(experimenter.logs) - 6))
             # print(f"Sending state from : {last_log}")
-            relevant_logs = stateLogs[last_log+1:]
+            relevant_experimenter.logs = experimenter.stateLogs[last_log+1:]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(relevant_logs).encode())
+            self.wfile.write(json.dumps(relevant_experimenter.logs).encode())
             return
             
         if self.path == "/info":
             index = int(self.headers.get('index', 0)) - 1
 
-            response = data_array[index] if 0 <= index < len(data_array) else {"text": "Invalid ID"}
+            response = experimenter.data_array[index] if 0 <= index < len(experimenter.data_array) else {"text": "Invalid ID"}
 
             self.send_response(200)
             self.send_header("Content-type", "application/json")
@@ -112,14 +150,14 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/reset":
             index = int(self.headers.get('index', 0)) - 1
 
-            response = {"text": "Reset Success"} if 0 <= index < len(data_array) else {"text": "Invalid ID"}
+            response = {"text": "Reset Success"} if 0 <= index < len(experimenter.data_array) else {"text": "Invalid ID"}
             
-            stateLog("Reset", index+1)
+            experimenter.stateLog("Reset", index+1)
             print(f"Resetting data {index + 1} because of webpage.")
             log(f"Reset index {index + 1} from webpage")
-            data_index.append(index)
-            givenToPC[index] = 'Reset'
-            completed_array[index] = False
+            experimenter.data_index.append(index)
+            experimenter.givenToPC[index] = 'Reset'
+            experimenter.completed_array[index] = False
             
             self.send_response(200)
             self.send_header("Content-type", "application/json")
@@ -132,37 +170,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         
         ID = self.headers.get('ID', '-1')
         
-        last = data_index.pop()
-        
-        if not data_index:
-            data_index.append(last + 1)
-        if(ID != '-1'):
-            if(not completed_array[int(ID) - 1]):
-                stateLog("Reset", int(ID))
-                print(f"Resetting data {int(ID) + 1} for {computer_name} due to new request.")
-                log(f"Reset index {int(ID) + 1} by {computer_name}")
-                data_index.append(int(ID))
-                givenToPC[int(ID)] = 'Reset'
-                completed_array[int(ID)] = False
-                
-        if last < len(data_array):
-            response_data = data_array[last]
-            if last == len(givenToPC):
-                givenToPC.append(computer_name)
-            else:
-                givenToPC[last] = computer_name
-            if last == len(completed_array):
-                completed_array.append(False)
-            else:
-                completed_array[last] = False
-            stateLog("Running", last + 1, computer_name)
-            display_colored_array(data_array)
-            log(f"Sent Data on index {last + 1} to {computer_name}")
-            print(f"Data {last+1} has been sent to {computer_name}")
-        else:
-            response_data = {"message": "No more data left."}
-            log(f"Shutting down {computer_name}")
-            print(f'Data Distribution is finished. Extra connections : ', (last - len(data_array)))
+        response_data = experimenter.getExperiment(ID, computer_name)
         
         response_json = json.dumps(response_data)
         self.send_response(200)
@@ -175,10 +183,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             computer_name = self.headers.get('ComputerName', 'Null')
             ID = self.headers.get('ID', '-1')
             if(ID != '-1'):
-                log(f"Recieved Data : {ID}")
-                stateLog("Finished", int(ID), computer_name)
-                print("ID " + ID + " is finished.")
-                completed_array[int(ID) - 1] = True
+                experimenter.complete(ID, computer_name)
                 
             content_length = int(self.headers['Content-Length'])
             if content_length <= 0:
@@ -220,7 +225,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             with open("data/" + file_name, 'wb') as f:
                 f.write(file_content)
 
-            display_colored_array(data_array)
+            display_colored_array(experimenter.data_array)
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"File uploaded and saved successfully")
@@ -304,22 +309,23 @@ def print_list_as_json(lst):
     print(json_str)
    
 def display_colored_array(data_array):
+    return
     print("\033[2J\033[H", end="")  # Clear the screen
 
     # Determine number of columns needed
-    total_rows = len(data_array)
+    total_rows = len(experimenter.data_array)
     num_columns = (total_rows + ROWS_PER_COLUMN - 1) // ROWS_PER_COLUMN
 
     # Prepare table data
     columns = [[] for _ in range(num_columns)]
-    for index, value in enumerate(data_array):
+    for index, value in enumerate(experimenter.data_array):
         column_index = index // ROWS_PER_COLUMN
         row_index = index % ROWS_PER_COLUMN
 
         # Determine status color and format value
-        status_color = (GREEN if (completed_array[index] == True) else (RED if givenToPC[index] == 'Reset' else Magenta)) if index < len(givenToPC) else RED
+        status_color = (GREEN if (experimenter.completed_array[index] == True) else (RED if experimenter.givenToPC[index] == 'Reset' else Magenta)) if index < len(experimenter.givenToPC) else RED
         status = f"{status_color}{index + 1}{RESET}"
-        pc_value = f"{YELLOW}({givenToPC[index]}){RESET}" if index < len(givenToPC) else f"{YELLOW}(N/A){RESET}"
+        pc_value = f"{YELLOW}({experimenter.givenToPC[index]}){RESET}" if index < len(experimenter.givenToPC) else f"{YELLOW}(N/A){RESET}"
 
         # Append row to the appropriate column
         columns[column_index].append(f"{status} {pc_value}")
@@ -336,33 +342,22 @@ def display_colored_array(data_array):
 def start_server(server):
     log("Server Started")
     print(f"Server running on {server.server_address[0]}:{server.server_address[1]}")
-    master_server = MasterServer()
-    master_server.defineMessage('client_connected', client_connected_handler)
-    master_server.defineMessage('client_disconnected', client_disconnected_handler)
     server.serve_forever()
 
 
-def client_connected_handler(message):
-    print(f"Client connected: {message['client_name']}")
-
-def client_disconnected_handler(message):
-    print(f"Client disconnected: {message['client_name']}")
-
-
-
 if __name__ == "__main__":
-    print("\033[2J\033[H", end="")  # Clear the screen
+    print("\033[2J\033[H", end="")
     if len(sys.argv) > 1:
-        data_index.append(int(sys.argv[1]) - 1)
-        if(data_index[-1] < 0):
-            data_index[-1] = 0
-        for i in range(1,data_index[-1] + 1):
-            stateLog("Finished", i, "PRE")
-            givenToPC.append("PRE")
-            completed_array.append(True)
+        experimenter.data_index.append(int(sys.argv[1]) - 1)
+        if(experimenter.data_index[-1] < 0):
+            experimenter.data_index[-1] = 0
+        for i in range(1,experimenter.data_index[-1] + 1):
+            experimenter.stateLog("Finished", i, "PRE")
+            experimenter.givenToPC.append("PRE")
+            experimenter.completed_array.append(True)
     else:
-        data_index.append(0)
-    # print(data_index[-1])
+        experimenter.data_index.append(0)
+    # print(experimenter.data_index[-1])
     id_counter = 1
     
     py_files = [f for f in os.listdir('.') if os.path.isfile(f) and f.endswith('.py') and f != os.path.basename(__file__)]
@@ -400,16 +395,16 @@ if __name__ == "__main__":
         code = f.read()  # Read the script content
 
     exec(code)  # Execute the script dynamically
+    experimenter.data_array = data_array
 
     
-    server = HTTPServer((host, port), MyRequestHandler)
+    server = HTTPServer((host, port), HTTPHandler)
 
     server_thread = threading.Thread(target=start_server, args=(server,), daemon=True)
     server_thread.start()
 
     try:
         while True:
-            display_colored_array(data_array)
             user_input = input()
             if user_input.lower() == 'quit':
                 print("Shutting down the server...")
@@ -421,11 +416,11 @@ if __name__ == "__main__":
             elif user_input.startswith('print '):
                 try:
                     index = int(user_input.split()[1]) - 1
-                    if 0 <= index < len(data_array):
-                        print(json.dumps(data_array[index], indent=2))
+                    if 0 <= index < len(experimenter.data_array):
+                        print(json.dumps(experimenter.data_array[index], indent=2))
                         input()
                     else:
-                        print(f"Index {index+1} is out of bounds. Array length is 1-{len(data_array)}.")
+                        print(f"Index {index+1} is out of bounds. Array length is 1-{len(experimenter.data_array)}.")
                 except (IndexError, ValueError):
                     print("Invalid command format. Use 'print x', where x is a valid index.")
             elif user_input.startswith('reset '):
@@ -436,28 +431,18 @@ if __name__ == "__main__":
                         start, end = map(int, indices.split(':'))
                         start, end = start - 1, end - 1
                         
-                        if 0 <= start < len(givenToPC) and 0 <= end < len(givenToPC) and start <= end:
+                        if 0 <= start < len(experimenter.givenToPC) and 0 <= end < len(experimenter.givenToPC) and start <= end:
                             for index in range(start, end + 1):
-                                stateLog("Reset", index + 1)
-                                log(f"Reset index {index + 1} from terminal.")
-                                data_index.append(index)
-                                givenToPC[index] = 'Reset'
-                                completed_array[index] = False
-                            display_colored_array(data_array)
+                                experimenter.reset(index)
                         else:
-                            print(f"Invalid range. Ensure both indices are within 1-{len(givenToPC)} and start ≤ end.")
+                            print(f"Invalid range. Ensure both indices are within 1-{len(experimenter.givenToPC)} and start ≤ end.")
                     
                     else:
                         index = int(indices) - 1
-                        if 0 <= index < len(givenToPC):
-                            stateLog("Reset", index + 1)
-                            log(f"Reset index {index + 1} from terminal.")
-                            data_index.append(index)
-                            givenToPC[index] = 'Reset'
-                            completed_array[index] = False
-                            display_colored_array(data_array)
+                        if 0 <= index < len(experimenter.givenToPC):
+                            experimenter.reset(index)
                         else:
-                            print(f"Index {index + 1} is out of bounds. Array length is 1-{len(givenToPC)}.")
+                            print(f"Index {index + 1} is out of bounds. Array length is 1-{len(experimenter.givenToPC)}.")
                 except (IndexError, ValueError):
                     print("Invalid command format. Use 'reset x' or 'reset x:y', where x and y are valid indices.")
 
