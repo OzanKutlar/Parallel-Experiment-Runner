@@ -180,21 +180,17 @@ def send_to_upstream():
     print(f"Connected to upstream server at {UPSTREAM_HOST}:{UPSTREAM_PORT}")
 
     threading.Thread(target=listen_upstream, args=(upstream,), daemon=True).start()
-
-    # Start heartbeat thread
     threading.Thread(target=heartbeat_thread, args=(upstream,), daemon=True).start()
 
     while True:
-        response_event.wait()
-        while not request_queue.empty():
-            message = request_queue.get()
-            message['manager_id'] = manager_id
-            try:
-                upstream.send((json.dumps(message) + "\n").encode('utf-8'))
-            except Exception as e:
-                print(f"Error sending to upstream: {e}")
-            request_queue.task_done()
-        response_event.clear()
+        message = request_queue.get()  # <--- BLOCKS until something is available
+        message['manager_id'] = manager_id
+        try:
+            upstream.send((json.dumps(message) + "\n").encode('utf-8'))
+        except Exception as e:
+            print(f"Error sending to upstream: {e}")
+        request_queue.task_done()
+
 
 
 
