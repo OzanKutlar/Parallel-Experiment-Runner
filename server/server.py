@@ -85,9 +85,22 @@ class SocketServer:
         self.server_socket.listen()
         self.running = False
         self.threads = []
+        
+        
+        self.manager_list = []  # List of connected clients
+        self.client_id_counter = 1  # Counter for generating unique client IDs
 
     def handle_client(self, client_socket, addr):
         print(f"Connection from {addr}")
+        
+        # Generate a new client ID and assign it to the client
+        client_id = self.client_id_counter
+        self.client_id_counter += 1
+        self.manager_list.append({'id': client_id, 'address': addr})
+        
+        # Send the generated client ID back to the client
+        client_socket.send(json.dumps({'client_id': client_id}).encode('utf-8'))
+
         try:
             while True:
                 data = client_socket.recv(1024).decode('utf-8')
@@ -95,14 +108,25 @@ class SocketServer:
                     break
                 try:
                     message = json.loads(data)
-                    print(f"Received from {addr}: {message}")
-                    response = {'status': 'ok', 'received': message}
+                    
+                    response = {'status': 'ok', 'received': message, 'client_id': client_id}
+                    
+                    if('req' in message):
+                        request = message['req']
+                        if(request == 'get'):
+                            response = {'status': 'ok', 'data': experimenter.getExperiment("-1", str(client_id)), 'client_id': client_id}
+                        
+                    
+                    # print(f"Received from client {client_id} ({addr}): {message}")
+                    
                     client_socket.send(json.dumps(response).encode('utf-8'))
                 except json.JSONDecodeError:
                     client_socket.send(json.dumps({'error': 'Invalid JSON'}).encode('utf-8'))
         finally:
+            # Remove the client from the manager list when they disconnect
+            self.manager_list = [client for client in self.manager_list if client['id'] != client_id]
             client_socket.close()
-            print(f"Connection closed with {addr}")
+            print(f"Connection closed with client {client_id} ({addr})")
 
     def start(self):
         self.running = True
@@ -166,29 +190,29 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(str(len(experimenter.data_array)).encode())
             return
         
-        if self.path == "/experimenter.logs":
+        if self.path == "/logs":
             last_log = int(self.headers.get('lastLog', len(experimenter.logs) - 6))
             # print(f"Request came for a log with lastlog : {last_log}")
             if(last_log <= len(experimenter.logs) - 6):
-                relevant_experimenter.logs = experimenter.logs[-5:]
+                relevant_logs = experimenter.logs[-5:]
             else:
-                relevant_experimenter.logs = experimenter.logs[last_log+1:last_log+5]
+                relevant_logs = experimenter.logs[last_log+1:last_log+5]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(relevant_experimenter.logs).encode())
+            self.wfile.write(json.dumps(relevant_logs).encode())
             return
             
         if self.path == "/status":
             last_log = int(self.headers.get('lastLog', len(experimenter.logs) - 6))
             # print(f"Sending state from : {last_log}")
-            relevant_experimenter.logs = experimenter.stateLogs[last_log+1:]
+            relevant_logs = experimenter.stateLogs[last_log+1:]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(relevant_experimenter.logs).encode())
+            self.wfile.write(json.dumps(relevant_logs).encode())
             return
             
         if self.path == "/info":
@@ -481,6 +505,8 @@ if __name__ == "__main__":
             elif user_input.startswith('reset '):
                 try:
                     indices = user_input.split()[1]
+                    
+                    print("Resetting indices : " + user_input.split()[1])
                     
                     if ':' in indices:
                         start, end = map(int, indices.split(':'))
