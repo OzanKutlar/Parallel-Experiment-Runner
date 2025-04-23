@@ -54,9 +54,16 @@ def handle_client_connection(conn, addr, client_id):
 
     try:
         while True:
-            data = conn.recv(1024)
-            if not data:
-                break
+            buffer = ""
+            while True:
+                chunk = conn.recv(1024).decode('utf-8')
+                if not chunk:
+                    data = buffer
+                    break
+                buffer += chunk
+                if '\n' in buffer:
+                    data, buffer = buffer.split('\n', 1)
+                    break
 
             message = json.loads(data.decode('utf-8'))
             
@@ -134,7 +141,6 @@ def listen_upstream(upstream):
                             except Exception as e:
                                 print(f"Error sending shutdown to client: {e}")
                         
-                        os._exit(0)
             else:
                 # Forward regular response to the client
                 client_id = response.get('client_id')

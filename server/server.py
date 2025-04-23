@@ -102,7 +102,16 @@ class SocketServer:
         try:
             while True:
                 try:
-                    data = client_socket.recv(1024).decode('utf-8')
+                    buffer = ""
+                    while True:
+                        chunk = conn.recv(1024).decode('utf-8')
+                        if not chunk:
+                            data = buffer
+                            break
+                        buffer += chunk
+                        if '\n' in buffer:
+                            data, buffer = buffer.split('\n', 1)
+                            break
                 except ConnectionResetError:
                     continue
                 if not data:

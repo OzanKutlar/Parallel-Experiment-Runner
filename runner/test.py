@@ -36,7 +36,7 @@ def listen_to_server(sock):
                                 'filename': "file" + str(client_id),
                                 'file': file_content
                             }
-                            sock.send(json.dumps(file_response).encode('utf-8'))
+                            sock.send((json.dumps(file_response) + "\n").encode('utf-8'))
                             print(f"Sent file '{filename}' in base64 format.")
                         else:
                             print(f"File '{filename}' not found in current directory.")
