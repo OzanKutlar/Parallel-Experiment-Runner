@@ -104,7 +104,7 @@ class SocketServer:
                 try:
                     buffer = ""
                     while True:
-                        chunk = conn.recv(1024).decode('utf-8')
+                        chunk = client_socket.recv(1024).decode('utf-8')
                         if not chunk:
                             data = buffer
                             break
