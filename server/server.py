@@ -117,7 +117,7 @@ class SocketServer:
                         if request == 'get':
                             response = {
                                 'status': 'ok',
-                                'data': experimenter.getExperiment("-1", str(message['client_id'])),
+                                'data': experimenter.getExperiment("-1", str(message['ComputerName'])),
                                 'client_id': message['client_id']
                             }
 

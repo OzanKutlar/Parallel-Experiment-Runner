@@ -36,7 +36,7 @@ def send_to_server(sock):
                 sock.close()
                 break
 
-            request = {'req': msg}
+            request = {'req': msg, 'ComputerName': os.getenv('COMPUTERNAME')}
             sock.send(json.dumps(request).encode('utf-8'))
     except Exception as e:
         print("Error in sending thread:", e)
