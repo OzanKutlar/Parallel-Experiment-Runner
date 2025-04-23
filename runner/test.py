@@ -9,6 +9,7 @@ import base64
 client_id = 0
 
 def listen_to_server(sock):
+    global client_id
     try:
         while True:
             data = sock.recv(1024).decode('utf-8')
@@ -69,6 +70,7 @@ def send_to_server(sock):
         sock.close()
 
 def test_client(proxy_host='127.0.0.1', proxy_port=65431):
+    global client_id
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((proxy_host, proxy_port))
 

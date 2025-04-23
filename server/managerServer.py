@@ -70,6 +70,9 @@ def handle_client_connection(conn, addr, client_id):
             if message.get("type") == "heartbeat":
                 continue  # Just ignore and wait for the next real message
             
+            if(message.get("req") == "file"):
+                print(f"Recieved file from client {client_id}")
+            
             message['client_id'] = client_id  # Ensure client_id is present
 
             # Add the message to the queue
