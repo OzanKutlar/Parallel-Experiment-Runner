@@ -20,6 +20,23 @@ response_event = threading.Event()
 lock = threading.Lock()
 
 HEARTBEAT_INTERVAL = 10
+PENDING_MESSAGES = {}  # client_id -> (message, timestamp)
+RETRY_INTERVAL = 5     # seconds
+
+def retry_unacknowledged_messages(upstream_socket):
+    while True:
+        time.sleep(1)
+        current_time = time.time()
+        with lock:
+            for client_id, (message, timestamp) in list(PENDING_MESSAGES.items()):
+                if current_time - timestamp >= RETRY_INTERVAL:
+                    try:
+                        print(f"[Retry] Resending message from client {client_id}")
+                        upstream_socket.send((json.dumps(message) + "\n").encode('utf-8'))
+                        PENDING_MESSAGES[client_id] = (message, current_time)
+                    except Exception as e:
+                        print(f"Failed to resend message for client {client_id}: {e}")
+
 
 def heartbeat_thread(upstream_socket):
     while True:
@@ -111,9 +128,14 @@ def listen_upstream(upstream):
                 break
 
             response = json.loads(data.decode('utf-8'))
-            
+
             if response.get("type") == "heartbeat":
-                continue  # Just log or ignore
+                continue
+
+            client_id = response.get('client_id')
+            if client_id is not None:
+                with lock:
+                    PENDING_MESSAGES.pop(client_id, None)
 
             if 'command' in response:
                 command = response['command']
@@ -181,15 +203,19 @@ def send_to_upstream():
 
     threading.Thread(target=listen_upstream, args=(upstream,), daemon=True).start()
     threading.Thread(target=heartbeat_thread, args=(upstream,), daemon=True).start()
+    threading.Thread(target=retry_unacknowledged_messages, args=(upstream,), daemon=True).start()
 
     while True:
-        message = request_queue.get()  # <--- BLOCKS until something is available
+        message = request_queue.get()
         message['manager_id'] = manager_id
         try:
             upstream.send((json.dumps(message) + "\n").encode('utf-8'))
+            with lock:
+                PENDING_MESSAGES[message['client_id']] = (message, time.time())
         except Exception as e:
             print(f"Error sending to upstream: {e}")
         request_queue.task_done()
+
 
 
 
