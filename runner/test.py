@@ -5,6 +5,9 @@ import threading
 import sys
 import os
 import base64
+import subprocess
+import tempfile
+import shutil
 
 client_id = 0
 
@@ -47,6 +50,39 @@ def listen_to_server(sock):
                     else:
                         print("Unknown command:", command)
 
+                # Check if the response contains 'data'
+                elif 'data' in response:
+                    data = response['data']
+                    print("Received 'data' field, running MATLAB function...")
+
+                    # Prepare the data to be passed to MATLAB
+                    try:
+                        # Convert the data to a temporary MATLAB-readable .mat file
+                        temp_mat_file = create_temp_mat_file(data)
+
+                        # Define the MATLAB command to execute the function in batch mode
+                        command = f"matlab -batch \"result_filename = runExp('{temp_mat_file}'); disp(result_filename);\""
+                        print(f"Running MATLAB command: {command}")
+
+                        # Run the MATLAB command using subprocess
+                        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+
+                        # Check for any errors in MATLAB's output
+                        if result.returncode != 0:
+                            print(f"MATLAB error: {result.stderr}")
+                        else:
+                            print(f"MATLAB output:\n{result.stdout}")
+                            # Extract the filename from MATLAB output
+                            result_filename = extract_filename_from_output(result.stdout)
+                            print(f"Received filename from MATLAB: {result_filename}")
+
+
+                        # Cleanup the temporary .mat file
+                        os.remove(temp_mat_file)
+
+                    except Exception as e:
+                        print(f"Error while running MATLAB function: {e}")
+
                 else:
                     print("Response from server:", response)
 
@@ -56,6 +92,43 @@ def listen_to_server(sock):
         print("Error in listening thread:", e)
         sock.close()
         sys.exit(1)
+
+def create_temp_mat_file(data):
+    """
+    Creates a temporary .mat file from the provided data (which should be a dictionary)
+    to be used by the MATLAB batch command.
+    """
+    # Create a temporary directory to hold the .mat file
+    temp_dir = tempfile.mkdtemp()
+
+    # Save the Python dictionary as a .mat file
+    temp_mat_file = os.path.join(temp_dir, "data.mat")
+    
+    try:
+        import scipy.io
+        # Save the data as a .mat file
+        scipy.io.savemat(temp_mat_file, {'data': data})
+    except ImportError:
+        print("scipy module is required for saving .mat files.")
+        raise
+
+    return temp_mat_file
+
+def extract_filename_from_output(output):
+    """
+    Extracts the filename from MATLAB's output.
+    Assuming the output is something like:
+    'result_filename = <path_to_file>'
+    """
+    # Find the part that contains the filename (after 'result_filename = ')
+    lines = output.splitlines()
+    for line in lines:
+        if line.startswith("result_filename"):
+            # Extract the filename path
+            return line.split('=')[-1].strip().strip("'")
+    return ""
+
+
 
 def send_to_server(sock):
     try:
@@ -71,6 +144,8 @@ def send_to_server(sock):
     except Exception as e:
         print("Error in sending thread:", e)
         sock.close()
+
+
 
 def test_client(proxy_host='127.0.0.1', proxy_port=65431):
     global client_id
