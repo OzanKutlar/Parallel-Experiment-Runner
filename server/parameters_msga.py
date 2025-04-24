@@ -75,13 +75,13 @@ empty_param = {
 data_one, id_counter = generate_combined_data(
     shared_params,
     id_counter,
-    # empty_param
-    cec2008,
-    cec2008_f7,
-    cec2010,
-    cec2013,
-    cec2017,
-    cec2020
+    empty_param
+    # cec2008,
+    # cec2008_f7,
+    # cec2010,
+    # cec2013,
+    # cec2017,
+    # cec2020
 )
 
 def norm(v):

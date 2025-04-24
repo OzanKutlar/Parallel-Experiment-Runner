@@ -8,6 +8,7 @@ import base64
 import subprocess
 import tempfile
 import shutil
+from mat4py import savemat
 
 client_id = 0
 
@@ -61,7 +62,9 @@ def listen_to_server(sock):
                         temp_mat_file = create_temp_mat_file(data)
 
                         # Define the MATLAB command to execute the function in batch mode
-                        command = f"matlab -batch \"result_filename = runExp('{temp_mat_file}'); disp(result_filename);\""
+                        current_dir = os.getcwd()
+                        command = f"matlab -batch \"cd('{current_dir}'); result_filename = runExp('{temp_mat_file}'); disp(result_filename);\""
+
                         print(f"Running MATLAB command: {command}")
 
                         # Run the MATLAB command using subprocess
@@ -74,8 +77,21 @@ def listen_to_server(sock):
                             print(f"MATLAB output:\n{result.stdout}")
                             # Extract the filename from MATLAB output
                             result_filename = extract_filename_from_output(result.stdout)
+                            # Use only the basename for filename
+                            filename = os.path.basename(result_filename)
                             print(f"Received filename from MATLAB: {result_filename}")
+                            print(f"Using filename: {filename}")
 
+                            if os.path.isfile(result_filename):
+                                with open(result_filename, 'rb') as f:
+                                    file_content = base64.b64encode(f.read()).decode('utf-8')
+                                file_response = {
+                                    'req': 'file',
+                                    'filename': filename,
+                                    'file': file_content
+                                }
+                                sendUpstream(file_response, sock)
+                                print(f"Sent file '{filename}' in base64 format.")
 
                         # Cleanup the temporary .mat file
                         os.remove(temp_mat_file)
@@ -105,9 +121,8 @@ def create_temp_mat_file(data):
     temp_mat_file = os.path.join(temp_dir, "data.mat")
     
     try:
-        import scipy.io
         # Save the data as a .mat file
-        scipy.io.savemat(temp_mat_file, {'data': data})
+        savemat(temp_mat_file, {'data': data})
     except ImportError:
         print("scipy module is required for saving .mat files.")
         raise
@@ -116,16 +131,13 @@ def create_temp_mat_file(data):
 
 def extract_filename_from_output(output):
     """
-    Extracts the filename from MATLAB's output.
-    Assuming the output is something like:
-    'result_filename = <path_to_file>'
+    Extracts the last non-whitespace line from MATLAB's output.
+    This assumes the last meaningful line contains the filename.
     """
-    # Find the part that contains the filename (after 'result_filename = ')
-    lines = output.splitlines()
-    for line in lines:
-        if line.startswith("result_filename"):
-            # Extract the filename path
-            return line.split('=')[-1].strip().strip("'")
+    lines = output.strip().splitlines()
+    for line in reversed(lines):
+        if line.strip():  # Check if the line is not just whitespace
+            return line.strip()
     return ""
 
 
