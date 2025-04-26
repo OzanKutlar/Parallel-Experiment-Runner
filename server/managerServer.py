@@ -140,35 +140,37 @@ def listen_upstream(upstream):
                 with lock:
                     PENDING_MESSAGES.pop(client_id, None)
 
-            if 'command' in response:
-                command = response['command']
-                if command == 'shutdown':
-                    print("Received shutdown command. Notifying all clients.")
-                    with lock:
-                        for client_conn in clients.values():
-                            try:
-                                client_conn.send(json.dumps({'command': 'shutdown'}).encode('utf-8'))
-                            except Exception as e:
-                                print(f"Error sending shutdown to client: {e}")
+            if 'client_id' not in response:
+                if('command' in response):
+                    command = response['command']
+                    print(f"Redirecting command {command} to all clients")
+                    if command == 'shutdown':
+                        print("Received shutdown command. Notifying all clients.")
+                        with lock:
+                            for client_conn in clients.values():
+                                try:
+                                    client_conn.send(json.dumps({'command': 'shutdown'}).encode('utf-8'))
+                                except Exception as e:
+                                    print(f"Error sending shutdown to client: {e}")
+                            
+                            os._exit(0)
+                    elif command == 'report':
+                        print("Received report command. Sending status to upstream.")
+                        with lock:
+                            report = {
+                                'manager_id': response.get('manager_id'),  # use the one sent
+                                'client_count': len(clients)
+                            }
+                        sendUpstream(report, upstream)
                         
-                        os._exit(0)
-                elif command == 'report':
-                    print("Received report command. Sending status to upstream.")
-                    with lock:
-                        report = {
-                            'manager_id': response.get('manager_id'),  # use the one sent
-                            'client_count': len(clients)
-                        }
-                    sendUpstream(report, upstream)
-                elif command.startswith("file "):
-                    print("Received file request command. Notifying all clients.")
-                    with lock:
-                        for client_conn in clients.values():
-                            try:
-                                client_conn.send(json.dumps(response).encode('utf-8'))
-                            except Exception as e:
-                                print(f"Error sending shutdown to client: {e}")
-                        
+                    else:
+                        with lock:
+                            for client_conn in clients.values():
+                                try:
+                                    client_conn.send(json.dumps(response).encode('utf-8'))
+                                except Exception as e:
+                                    print(f"Error sending shutdown to client: {e}")
+                            
             else:
                 # Forward regular response to the client
                 client_id = response.get('client_id')

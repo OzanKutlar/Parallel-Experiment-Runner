@@ -28,11 +28,17 @@ def listen_to_server(sock):
                 response = json.loads(data)
                 if 'command' in response:
                     command = response['command']
+                    print(f"Recieved command {command}")
 
                     if command == 'shutdown':
                         print("Received shutdown command. Exiting...")
                         sock.close()
                         os._exit(0)
+                    
+                    elif command == 'start':
+                        print(f"Starting experimenting.")
+                        request = {'req': "get", 'ComputerName': os.getenv('COMPUTERNAME')}
+                        sendUpstream(request, sock)
 
                     elif command.startswith('file '):
                         filename = command[5:].strip()
@@ -58,44 +64,49 @@ def listen_to_server(sock):
 
                     # Prepare the data to be passed to MATLAB
                     try:
-                        # Convert the data to a temporary MATLAB-readable .mat file
-                        temp_mat_file = create_temp_mat_file(data)
+                        def runMatlab():
+                            # Convert the data to a temporary MATLAB-readable .mat file
+                            temp_mat_file = create_temp_mat_file(data)
 
-                        # Define the MATLAB command to execute the function in batch mode
-                        current_dir = os.getcwd()
-                        command = f"matlab -batch \"cd('{current_dir}'); result_filename = runExp('{temp_mat_file}'); disp(result_filename);\""
+                            # Define the MATLAB command to execute the function in batch mode
+                            current_dir = os.getcwd()
+                            command = f"matlab -batch \"cd('{current_dir}'); result_filename = runExp('{temp_mat_file}'); disp(result_filename);\""
 
-                        print(f"Running MATLAB command: {command}")
+                            print(f"Running MATLAB command: {command}")
 
-                        # Run the MATLAB command using subprocess
-                        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                            # Run the MATLAB command using subprocess
+                            result = subprocess.run(command, shell=True, capture_output=True, text=True)
 
-                        # Check for any errors in MATLAB's output
-                        if result.returncode != 0:
-                            print(f"MATLAB error: {result.stderr}")
-                        else:
-                            print(f"MATLAB output:\n{result.stdout}")
-                            # Extract the filename from MATLAB output
-                            result_filename = extract_filename_from_output(result.stdout)
-                            # Use only the basename for filename
-                            filename = os.path.basename(result_filename)
-                            print(f"Received filename from MATLAB: {result_filename}")
-                            print(f"Using filename: {filename}")
+                            # Check for any errors in MATLAB's output
+                            if result.returncode != 0:
+                                print(f"MATLAB error: {result.stderr}")
+                            else:
+                                print(f"MATLAB output:\n{result.stdout}")
+                                # Extract the filename from MATLAB output
+                                result_filename = extract_filename_from_output(result.stdout)
+                                # Use only the basename for filename
+                                filename = os.path.basename(result_filename)
+                                print(f"Received filename from MATLAB: {result_filename}")
+                                print(f"Using filename: {filename}")
 
-                            if os.path.isfile(result_filename):
-                                with open(result_filename, 'rb') as f:
-                                    file_content = base64.b64encode(f.read()).decode('utf-8')
-                                file_response = {
-                                    'req': 'file',
-                                    'filename': filename,
-                                    'file': file_content
-                                }
-                                sendUpstream(file_response, sock)
-                                print(f"Sent file '{filename}' in base64 format.")
+                                if os.path.isfile(result_filename):
+                                    with open(result_filename, 'rb') as f:
+                                        file_content = base64.b64encode(f.read()).decode('utf-8')
+                                    file_response = {
+                                        'req': 'file',
+                                        'ID': data.get('id'),
+                                        'ComputerName': os.getenv('COMPUTERNAME'),
+                                        'filename': filename,
+                                        'file': file_content
+                                    }
+                                    sendUpstream(file_response, sock)
+                                    print(f"Sent file '{filename}' in base64 format.")
 
-                        # Cleanup the temporary .mat file
-                        os.remove(temp_mat_file)
-
+                            # Cleanup the temporary .mat file
+                            os.remove(temp_mat_file)
+                        
+                        matlabThread = threading.Thread(target=runMatlab)
+                        matlabThread.start()
                     except Exception as e:
                         print(f"Error while running MATLAB function: {e}")
 

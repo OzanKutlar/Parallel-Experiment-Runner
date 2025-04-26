@@ -135,15 +135,20 @@ class SocketServer:
                     if 'req' in message:
                         request = message['req']
                         if request == 'get':
+                            data = experimenter.getExperiment("-1", str(message['ComputerName']));
                             response = {
                                 'status': 'ok',
-                                'data': experimenter.getExperiment("-1", str(message['ComputerName'])),
+                                'data': data,
+                                'id': data.get('id'),
                                 'client_id': message['client_id']
                             }
                         elif request == 'file':
                             filename = message.get('filename')
                             file_content_b64 = message.get('file')
-                            print(f"Recieved {filename} from {message.get('client_id')}")
+                            if('ComputerName' in message):
+                                print(f"Recieved {filename} from {message.get('ComputerName')}")
+                            else:
+                                print(f"Recieved {filename} from Client {message.get('client_id')} in Manager {manager_id}")
 
                             if filename and file_content_b64:
                                 try:
@@ -154,11 +159,31 @@ class SocketServer:
                                     with open(filename, 'wb') as f:
                                         f.write(file_data)
 
-                                    response = {
-                                        'status': 'success',
-                                        'message': f"File '{filename}' saved successfully.",
-                                        'client_id': message.get('client_id', 'unknown')
-                                    }
+                                    if('ID' in message):
+                                        experimenter.complete(message.get('ID'), message.get('ComputerName'))
+                                        
+                                        data = experimenter.getExperiment(message.get('ID'), str(message['ComputerName']));
+                                        
+                                        if('message' in data):
+                                            response = {
+                                                'command': "shutdown",
+                                                'client_id': message.get('client_id', 'unknown')
+                                            }
+                                        else:
+                                            response = {
+                                                'status': 'success',
+                                                'message': f"File '{filename}' saved successfully.",
+                                                'data': data,
+                                                'id': data.get('id'),
+                                                'client_id': message.get('client_id', 'unknown')
+                                            }
+                                        
+                                    else:
+                                        response = {
+                                            'status': 'success',
+                                            'message': f"File '{filename}' saved successfully.",
+                                            'client_id': message.get('client_id', 'unknown')
+                                        }
                                 except Exception as e:
                                     response = {
                                         'status': 'error',
@@ -574,6 +599,8 @@ if __name__ == "__main__":
             if user_input.lower() == 'quit':
                 print("Shutting down the server...")
                 break
+            if user_input.lower() == "start":
+                socket_server.sendCommand("start")
             elif user_input.startswith('print '):
                 try:
                     index = int(user_input.split()[1]) - 1
