@@ -1,10 +1,15 @@
 shared_params = {
     "pop": [100, 200, 500],
     # "repeat": [5],
-    "tournamentPer": [0, 0.25, 0.5, 0.75, 1],
-    "stocPer": [0, 0.25, 0.5, 0.75, 1],
-    "rankPer": [0, 0.25, 0.5, 0.75, 1],
-    "truncPer": [0, 0.25, 0.5, 0.75, 1]
+    # "tournamentPer": [0, 0.25, 0.5, 0.75, 1],
+    # "stocPer": [0, 0.25, 0.5, 0.75, 1],
+    # "rankPer": [0, 0.25, 0.5, 0.75, 1],
+    # "truncPer": [0, 0.25, 0.5, 0.75, 1]
+    "tournamentPer": [0, 0.25],
+    "stocPer": [0, 0.25],
+    "rankPer": [0, 0.25],
+    "truncPer": [0, 0.25]
+
 }
 
 # https://www.researchgate.net/publication/228932005_Benchmark_functions_for_the_CEC'2008_special_session_and_competition_on_large_scale_global_optimization

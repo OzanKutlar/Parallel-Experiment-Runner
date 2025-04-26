@@ -54,7 +54,7 @@ class Experimenter:
             print(f"Data {last+1} has been sent to {computer_name}")
         else:
             response_data = {"message": "No more data left."}
-            self.log(f"Shutting down {computer_name}")
+            log(f"Shutting down {computer_name}")
             print(f'Data Distribution is finished. Extra connections : ', (last - len(self.data_array)))
         
         return response_data
@@ -117,6 +117,9 @@ class SocketServer:
                 if not data:
                     break
                 try:
+                    
+                    # print(f"Got message : {data}")
+                    
                     message = json.loads(data)
                     
                     if message.get("type") == "heartbeat":
@@ -160,9 +163,9 @@ class SocketServer:
                                         f.write(file_data)
 
                                     if('ID' in message):
-                                        experimenter.complete(message.get('ID'), message.get('ComputerName'))
+                                        experimenter.complete(str(message.get('ID')), message.get('ComputerName'))
                                         
-                                        data = experimenter.getExperiment(message.get('ID'), str(message['ComputerName']));
+                                        data = experimenter.getExperiment(str(message.get('ID')), str(message['ComputerName']));
                                         
                                         if('message' in data):
                                             response = {
@@ -185,6 +188,8 @@ class SocketServer:
                                             'client_id': message.get('client_id', 'unknown')
                                         }
                                 except Exception as e:
+                                    # import traceback
+                                    # traceback.print_exc()
                                     response = {
                                         'status': 'error',
                                         'message': f"Failed to save file '{filename}': {e}",
@@ -204,6 +209,7 @@ class SocketServer:
                                 'client_id': message.get('client_id', 'unknown')
                             }
 
+                    # print(f"Sent back : {json.dumps(response)}")
                     client_socket.send(json.dumps(response).encode('utf-8'))
 
                 except json.JSONDecodeError:

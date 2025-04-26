@@ -19,13 +19,14 @@ def listen_to_server(sock):
     global client_id
     try:
         while True:
-            data = sock.recv(1024).decode('utf-8')
-            if not data:
+            rawResp = sock.recv(1024).decode('utf-8')
+            if not rawResp:
                 print("Server closed the connection.")
                 break
 
             try:
-                response = json.loads(data)
+                print(f"Recieved : {rawResp}")
+                response = json.loads(rawResp)
                 if 'command' in response:
                     command = response['command']
                     print(f"Recieved command {command}")
@@ -60,8 +61,8 @@ def listen_to_server(sock):
                 # Check if the response contains 'data'
                 elif 'data' in response:
                     data = response['data']
+                    ID = response["id"]
                     print("Received 'data' field, running MATLAB function...")
-
                     # Prepare the data to be passed to MATLAB
                     try:
                         def runMatlab():
@@ -76,6 +77,7 @@ def listen_to_server(sock):
 
                             # Run the MATLAB command using subprocess
                             result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                            
 
                             # Check for any errors in MATLAB's output
                             if result.returncode != 0:
@@ -94,7 +96,7 @@ def listen_to_server(sock):
                                         file_content = base64.b64encode(f.read()).decode('utf-8')
                                     file_response = {
                                         'req': 'file',
-                                        'ID': data.get('id'),
+                                        'ID': ID,
                                         'ComputerName': os.getenv('COMPUTERNAME'),
                                         'filename': filename,
                                         'file': file_content
