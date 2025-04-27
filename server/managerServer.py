@@ -197,6 +197,19 @@ def send_to_upstream():
         if 'manager_id' in response:
             manager_id = response['manager_id']
             print(f"Registered with server. Manager ID: {manager_id}")
+
+            # Now send the PC name (Windows)
+            pc_name = os.getenv("COMPUTERNAME")
+            if not pc_name:
+                print("Error: Could not get computer name.")
+                return
+
+            pc_info = {
+                'manager_id': manager_id,
+                'pc_name': pc_name
+            }
+            upstream.sendall(json.dumps(pc_info).encode('utf-8'))
+            print(f"Sent PC name: {pc_name} to server.")
         else:
             print("Error: Server did not send manager ID.")
             return

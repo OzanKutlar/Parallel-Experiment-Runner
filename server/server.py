@@ -100,6 +100,21 @@ class SocketServer:
         client_socket.send(json.dumps({'manager_id': manager_id}).encode('utf-8'))
 
         try:
+            data = client_socket.recv(1024).decode('utf-8')
+            pc_info = json.loads(data)
+            if 'pc_name' in pc_info:
+                for manager in self.manager_list:
+                    if manager['id'] == manager_id:
+                        manager['computer_name'] = pc_info['pc_name']
+                        break
+                print(f"Manager {manager_id} registered from PC: {pc_info['pc_name']}")
+            else:
+                print(f"Warning: Manager {manager_id} did not send a computer name.")
+        except (json.JSONDecodeError, ConnectionError) as e:
+            print(f"Error receiving PC name from Manager {manager_id}: {e}")
+
+
+        try:
             while True:
                 try:
                     buffer = ""
@@ -131,7 +146,7 @@ class SocketServer:
                         response['client_id'] = message['client_id']
                     
                     if 'client_count' in message:
-                        print(f"Manager {manager_id} has {message.get('client_count')} computers connected.")
+                        print(f"Manager {pc_info['pc_name']} has {message.get('client_count')} computers connected.")
                         self.manager_list[manager_id - 1]['count'] = message.get('client_count')
                         
                     
@@ -151,7 +166,7 @@ class SocketServer:
                             if('ComputerName' in message):
                                 print(f"Recieved {filename} from {message.get('ComputerName')}")
                             else:
-                                print(f"Recieved {filename} from Client {message.get('client_id')} in Manager {manager_id}")
+                                print(f"Recieved {filename} from Client {message.get('client_id')} in Manager {pc_info['pc_name']}")
 
                             if filename and file_content_b64:
                                 try:
@@ -217,7 +232,7 @@ class SocketServer:
         finally:
             self.manager_list = [client for client in self.manager_list if client['id'] != manager_id]
             client_socket.close()
-            print(f"Connection closed with client {manager_id} ({addr})")
+            print(f"Connection closed with manager {pc_info['pc_name']} ({addr})")
 
     def start(self):
         self.running = True
