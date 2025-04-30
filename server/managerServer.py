@@ -31,15 +31,15 @@ def retry_unacknowledged_messages(upstream_socket):
     while True:
         time.sleep(1)
         current_time = time.time()
-        with lock:
-            for client_id, (message, timestamp) in list(PENDING_MESSAGES.items()):
-                if current_time - timestamp >= RETRY_INTERVAL:
-                    try:
-                        print(f"[Retry] Resending message from client {client_id} with message_id {message.get('message_id')}")
-                        sendUpstream(message, upstream_socket)
-                        PENDING_MESSAGES[client_id] = (message, current_time)
-                    except Exception as e:
-                        print(f"Failed to resend message for client {client_id}: {e}")
+        # with lock:
+            # for client_id, (message, timestamp) in list(PENDING_MESSAGES.items()):
+                # if current_time - timestamp >= RETRY_INTERVAL:
+                    # try:
+                        # print(f"[Retry] Resending message from client {client_id} with message_id {message.get('message_id')}")
+                        # sendUpstream(message, upstream_socket)
+                        # PENDING_MESSAGES[client_id] = (message, current_time)
+                    # except Exception as e:
+                        # print(f"Failed to resend message for client {client_id}: {e}")
 
 
 def heartbeat_thread(upstream_socket):
