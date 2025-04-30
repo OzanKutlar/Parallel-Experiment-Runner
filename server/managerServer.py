@@ -13,6 +13,7 @@ UPSTREAM_HOST = '127.0.0.1'  # Upstream server IP
 UPSTREAM_PORT = 65432        # Upstream server port
 
 client_id_counter = 1
+message_id_counter = 1  # New counter for message IDs
 clients = {}  # client_id -> client_socket
 request_queue = queue.Queue()
 response_event = threading.Event()
@@ -21,7 +22,7 @@ lock = threading.Lock()
 
 HEARTBEAT_INTERVAL = 10
 PENDING_MESSAGES = {}  # client_id -> (message, timestamp)
-RETRY_INTERVAL = 1     # seconds
+RETRY_INTERVAL = 20     # seconds
 
 def sendUpstream(obj, upstream_socket):
     upstream_socket.send((json.dumps(obj) + "\n").encode('utf-8'))
@@ -34,7 +35,7 @@ def retry_unacknowledged_messages(upstream_socket):
             for client_id, (message, timestamp) in list(PENDING_MESSAGES.items()):
                 if current_time - timestamp >= RETRY_INTERVAL:
                     try:
-                        print(f"[Retry] Resending message from client {client_id}")
+                        print(f"[Retry] Resending message from client {client_id} with message_id {message.get('message_id')}")
                         sendUpstream(message, upstream_socket)
                         PENDING_MESSAGES[client_id] = (message, current_time)
                     except Exception as e:
@@ -188,6 +189,7 @@ def listen_upstream(upstream):
 
 def send_to_upstream():
     global manager_id
+    global message_id_counter
     upstream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     upstream.connect((UPSTREAM_HOST, UPSTREAM_PORT))
     
@@ -226,16 +228,21 @@ def send_to_upstream():
     while True:
         message = request_queue.get()
         message['manager_id'] = manager_id
+        
+        # Add a unique message ID if this is a new message (not a retry)
+        if 'message_id' not in message:
+            with lock:
+                message['message_id'] = message_id_counter
+                message_id_counter += 1
+        
         try:
+            print(f"Sending message with ID {message['message_id']} from client {message['client_id']}")
             sendUpstream(message, upstream)
             with lock:
                 PENDING_MESSAGES[message['client_id']] = (message, time.time())
         except Exception as e:
             print(f"Error sending to upstream: {e}")
         request_queue.task_done()
-
-
-
 
 
 def force_shutdown():

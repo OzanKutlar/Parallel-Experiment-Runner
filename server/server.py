@@ -94,6 +94,8 @@ class SocketServer:
 
         manager_id = self.client_id_counter
         self.client_id_counter += 1
+        
+        message_responses = {}
 
         self.manager_list.append({'id': manager_id, 'address': addr, 'socket': client_socket, 'count': 0})
 
@@ -140,6 +142,19 @@ class SocketServer:
                     if message.get("type") == "heartbeat":
                         continue  # Just ignore and wait for the next real message
 
+                    message_id = message.get('message_id')
+                    
+                    if message_id is not None:
+                        cached_response = None
+                        if message_id in message_responses:
+                            cached_response = message_responses[message_id]
+                            print(f"Found cached response for manager {manager_id}, message_id {message_id}")
+                        
+                        # If we have a cached response, send it back immediately
+                        if cached_response:
+                            client_socket.send(json.dumps(cached_response).encode('utf-8'))
+                            continue
+                    
                     response = {'status': 'ok', 'received': message}
                     
                     if 'client_id' in message:
@@ -224,6 +239,9 @@ class SocketServer:
                                 'client_id': message.get('client_id', 'unknown')
                             }
 
+                    if message_id is not None:
+                        message_responses[message_id] = response
+                        
                     # print(f"Sent back : {json.dumps(response)}")
                     client_socket.send(json.dumps(response).encode('utf-8'))
 
