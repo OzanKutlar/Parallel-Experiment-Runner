@@ -1,10 +1,11 @@
 shared_params = {
     "pop": [100, 200, 500],
     # "repeat": [5],
-    "tournamentPer": [0, 0.25, 0.5, 0.75, 1],
-    "stocPer": [0, 0.25, 0.5, 0.75, 1],
-    "rankPer": [0, 0.25, 0.5, 0.75, 1],
-    "truncPer": [0, 0.25, 0.5, 0.75, 1]
+    "tournamentPer": [0, 1, 2, 3, 4],
+    "stocPer": [0, 1, 2, 3, 4],
+    "rankPer": [0, 1, 2, 3, 4],
+    "truncPer": [0, 1, 2, 3, 4],
+    "repeat": [30]
     # "tournamentPer": [0, 0.25],
     # "stocPer": [0, 0.25],
     # "rankPer": [0, 0.25],
@@ -70,7 +71,6 @@ cec2020 = {
 empty_param = {
     "maxFE": [1000],
     "func": [1],
-    "repeat": [2],
     "year": ["2020"],
     "D": [20]
 }
@@ -80,13 +80,13 @@ empty_param = {
 data_one, id_counter = generate_combined_data(
     shared_params,
     id_counter,
-    # empty_param
-    cec2008,
-    cec2008_f7,
-    cec2010,
-    cec2013,
-    cec2017,
-    cec2020
+    empty_param
+    # cec2008,
+    # cec2008_f7,
+    # cec2010,
+    # cec2013,
+    # cec2017,
+    # cec2020
 )
 
 def norm(v):
@@ -106,12 +106,12 @@ grouped_sets = {}
 
 for obj in data_one:
 
-    resultVec = [obj['tournamentPer'] + obj['stocPer'] + obj['rankPer'] + obj['truncPer']]
+    resultVec = [obj['tournamentPer'], obj['stocPer'], obj['rankPer'], obj['truncPer']]
     
-    
-    if(sum(resultVec) != 1):
+    if(sum(resultVec) != 4):
         continue
     
+    obj['tournamentPer'], obj['stocPer'], obj['rankPer'], obj['truncPer'] = obj['tournamentPer'] / 4, obj['stocPer'] / 4, obj['rankPer'] / 4, obj['truncPer'] / 4
     obj['id'] = id_counter
     id_counter += 1
     pruned_list.append(obj)
