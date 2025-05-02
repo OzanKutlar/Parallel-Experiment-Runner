@@ -89,7 +89,7 @@ if (isset($_GET['data'])) {
             }
             
             // const serverUrl = "http://" + window.location.hostname + ":3753/reset";
-            const serverUrl = "http://evolab:3753/reset";
+            const serverUrl = "http://evolab:33000/reset";
             const headers = {
                 'index': dataId
             };

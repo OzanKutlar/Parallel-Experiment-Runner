@@ -477,7 +477,7 @@
             currentPage = parseInt(getUrlParam('page')) || 1;
             
             // Fetch the number of boxes first
-            fetch(`http://${serverIp}:3753/getNum`)
+            fetch(`http://${serverIp}:33000/getNum`)
                 .then(response => response.text())
                 .then(data => {
                     numBoxes = parseInt(data);
@@ -492,7 +492,7 @@
                 })
                 .catch(error => {
                     console.error("Error fetching box count:", error);
-                    showErrorAnnouncement(`Failed to connect to server at ${serverIp}:3753`);
+                    showErrorAnnouncement(`Failed to connect to server at ${serverIp}:33000`);
                     // Still generate UI with default values
                     updatePagination();
                     generateBoxes();
@@ -673,7 +673,7 @@
         }
         
         function fetchLogs() {
-            const serverUrl = `http://${serverIp}:3753/logs`;
+            const serverUrl = `http://${serverIp}:33000/logs`;
             const headers = {
                 'lastLog': lastLog
             };
@@ -694,7 +694,7 @@
         }
         
         function fetchStates() {
-            const serverUrl = `http://${serverIp}:3753/status`;
+            const serverUrl = `http://${serverIp}:33000/status`;
             const headers = {
                 'lastLog': lastState
             };
@@ -750,7 +750,7 @@
         }
         
         function redbox(boxNumber) {
-            const serverUrl = `http://${serverIp}:3753/info`;
+            const serverUrl = `http://${serverIp}:33000/info`;
             const headers = {
                 'index': boxNumber
             };

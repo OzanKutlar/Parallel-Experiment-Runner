@@ -1,15 +1,29 @@
-powershell -Command Expand-Archive "C:\Users\exam\soft-robots-studio-3d.zip"
+Zip dosyasını açan komut : 
 
-powershell -Command Move-Item "C:\Users\exam\soft-robots-studio-3d\soft-robots-studio-3d" "C:\Users\exam\Desktop"
 
-matlab -sd "C:\Users\exam\Desktop\soft-robots-studio-3d" -r "GetFromServer('171.22.173.112', 30)"
+powershell -Command Expand-Archive "C:\Users\exam\PlatEMO.zip"
+
+Otomatik Kapama scripti : 
+
+"C:\Users\Exam\timerClose.bat"
+
+Matlab run example :
+matlab -sd "C:\Users\exam\PlatEMO\PlatEMO" -r "GetFromServer('10.1.36.81', '3753', 5)"
+
+.exe run Example : 
+powershell -Command cd "C:\Users\Exam\PlatEMO\PlatEMO"; .\test.exe --host "10.1.51.110"
+
+
+Close Commands : 
 
 taskkill /f /im "matlab*"
 
 taskkill /f /im "cmd.exe"
 
-powershell -Command Remove-Item -Recurse -Force "C:\Users\exam\soft-robots-studio-3d"
+powershell -Command Remove-Item -Recurse -Force "C:\Users\exam\PlatEMO"
 
-powershell -Command Remove-Item -Recurse -Force "C:\Users\exam\soft-robots-studio-3d.zip"
+powershell -Command Remove-Item -Recurse -Force "C:\Users\exam\PlatEMO\PlatEMO\experiments"
+
+powershell -Command Remove-Item -Recurse -Force "C:\Users\exam\PlatEMO.zip"
 
 powershell -Command Remove-Item -Recurse -Force "C:\Users\exam\Desktop\soft-robots-studio-3d"

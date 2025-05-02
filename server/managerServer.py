@@ -16,6 +16,7 @@ client_id_counter = 1
 message_id_counter = 1  # New counter for message IDs
 clients = {}  # client_id -> client_socket
 request_queue = queue.Queue()
+waiting_queue = queue.Queue()  # Queue for messages waiting for responses
 response_event = threading.Event()
 
 lock = threading.Lock()
@@ -23,23 +24,39 @@ lock = threading.Lock()
 HEARTBEAT_INTERVAL = 10
 PENDING_MESSAGES = {}  # client_id -> (message, timestamp)
 RETRY_INTERVAL = 20     # seconds
+MESSAGE_TIMEOUT = 5     # seconds for waiting queue timeout
+
 
 def sendUpstream(obj, upstream_socket):
+    sendUpstreamDirect(obj, upstream_socket)
+
+
+def sendUpstreamDirect(obj, upstream_socket):
     upstream_socket.send((json.dumps(obj) + "\n").encode('utf-8'))
 
-def retry_unacknowledged_messages(upstream_socket):
+
+def check_waiting_messages():
+    """Check for timed out messages in the waiting queue and requeue them"""
     while True:
         time.sleep(1)
         current_time = time.time()
-        # with lock:
-            # for client_id, (message, timestamp) in list(PENDING_MESSAGES.items()):
-                # if current_time - timestamp >= RETRY_INTERVAL:
-                    # try:
-                        # print(f"[Retry] Resending message from client {client_id} with message_id {message.get('message_id')}")
-                        # sendUpstream(message, upstream_socket)
-                        # PENDING_MESSAGES[client_id] = (message, current_time)
-                    # except Exception as e:
-                        # print(f"Failed to resend message for client {client_id}: {e}")
+        
+        # Check if any messages in the waiting queue have timed out
+        waiting_items = []
+        while not waiting_queue.empty():
+            waiting_items.append(waiting_queue.get())
+        
+        for message, timestamp in waiting_items:
+            if current_time - timestamp >= MESSAGE_TIMEOUT:
+                # This message has timed out, put it back in the request queue
+                print(f"[Timeout] Re-queuing message with ID {message.get('message_id')} from client {message.get('client_id')}")
+                request_queue.put(message)
+                response_event.set()  # Notify the upstream sender
+            else:
+                # Message hasn't timed out yet, put it back in the waiting queue
+                waiting_queue.put((message, timestamp))
+
+
 
 
 def heartbeat_thread(upstream_socket):
@@ -63,7 +80,6 @@ def heartbeat_thread(upstream_socket):
                     print(f"[Heartbeat] Failed to send to client {client_id}: {e}")
                     conn.close()
                     clients.pop(client_id, None)
-
 
 
 def handle_client_connection(conn, addr, client_id):
@@ -108,6 +124,7 @@ def handle_client_connection(conn, addr, client_id):
             clients.pop(client_id, None)
         conn.close()
 
+
 def listen_for_clients():
     global client_id_counter
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -123,20 +140,55 @@ def listen_for_clients():
             client_id_counter += 1
         threading.Thread(target=handle_client_connection, args=(conn, addr, client_id), daemon=True).start()
 
+
 def listen_upstream(upstream):
     while True:
         try:
-            data = upstream.recv(1024)
+            buffer = ""
+            while True:
+                chunk = upstream.recv(1024).decode('utf-8')
+                if not chunk:
+                    data = buffer
+                    break
+                buffer += chunk
+                if '\n' in buffer:
+                    data, buffer = buffer.split('\n', 1)
+                    break
+                    
             if not data:
                 print("Upstream connection closed.")
                 break
 
-            response = json.loads(data.decode('utf-8'))
+            response = json.loads(data)
 
             if response.get("type") == "heartbeat":
                 continue
 
             client_id = response.get('client_id')
+            response_id = response.get('response_id')
+            
+            # Check if this is a response to a message in the waiting queue
+            if response_id is not None:
+                # Get all items from waiting queue to check
+                waiting_items = []
+                while not waiting_queue.empty():
+                    waiting_items.append(waiting_queue.get())
+                
+                found_match = False
+                for message, timestamp in waiting_items:
+                    if message.get('message_id') == response_id:
+                        # Found the corresponding message, don't put it back
+                        print(f"Received response for message_id {response_id}")
+                        found_match = True
+                    else:
+                        # Put back messages that aren't matched
+                        waiting_queue.put((message, timestamp))
+                
+                if found_match:
+                    print(f"Removed message {response_id} from waiting queue")
+                else:
+                    print(f"Response ID {response_id} did not match any waiting messages")
+            
             if client_id is not None:
                 with lock:
                     PENDING_MESSAGES.pop(client_id, None)
@@ -223,7 +275,7 @@ def send_to_upstream():
 
     threading.Thread(target=listen_upstream, args=(upstream,), daemon=True).start()
     threading.Thread(target=heartbeat_thread, args=(upstream,), daemon=True).start()
-    threading.Thread(target=retry_unacknowledged_messages, args=(upstream,), daemon=True).start()
+    threading.Thread(target=check_waiting_messages, args=(), daemon=True).start()
 
     while True:
         message = request_queue.get()
@@ -238,6 +290,10 @@ def send_to_upstream():
         try:
             print(f"Sending message with ID {message['message_id']} from client {message['client_id']}")
             sendUpstream(message, upstream)
+            
+            # Add to waiting queue with current timestamp
+            waiting_queue.put((message, time.time()))
+            
             with lock:
                 PENDING_MESSAGES[message['client_id']] = (message, time.time())
         except Exception as e:
