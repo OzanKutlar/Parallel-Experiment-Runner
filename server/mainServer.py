@@ -1,194 +1,161 @@
 import threading
-import logging
 import time
-from typing import Dict, Any, Optional, Tuple
+import logging
+from typing import Dict, Any, Optional
+from socket_wrapper import SocketWrapper, logger as wrapper_logger
 
-# Use the updated SocketWrapper from the file (assuming it's saved as socket_wrapper.py)
-try:
-    from socket_wrapper import SocketWrapper, logger
-except ImportError:
-    print("Error: Make sure socket_wrapper.py is in the same directory.")
-    exit(1)
+# Configure main server logging
+logger = logging.getLogger('main_server')
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
-# --- Configuration ---
-HOST = '0.0.0.0'  # Listen on all available interfaces
-PORT = 3753       # The single mandatory port
-SERVER_ID = "MainServer"
-
-# --- Server State ---
-# Thread-safe storage for connected clients and registered sub-servers
-clients: Dict[str, Dict[str, Any]] = {} # { client_id: {'wrapper': SocketWrapper, 'address': tuple, 'sub_server_info': dict} }
-sub_servers: Dict[str, Dict[str, Any]] = {} # { sub_server_id: {'host': str, 'port': int, 'client_id': str} }
-clients_lock = threading.Lock()
-sub_servers_lock = threading.Lock()
-
-# --- Message Handlers ---
-
-def handle_register_subserver(message: Dict[str, Any], client_id: str, client_address: Tuple[str, int]) -> Optional[Dict[str, Any]]:
-    """Handles requests from clients wanting to register as sub-servers."""
-    sub_port = message.get('port')
-    sub_id = message.get('id', client_id) # Use provided ID or default to client ID
-
-    if not isinstance(sub_port, int) or not (0 < sub_port < 65536):
-        logger.warning(f"Invalid port {sub_port} received from {client_id} @ {client_address}. Ignoring registration.")
-        return {'type': 'REGISTER_ACK', 'status': 'ERROR', 'detail': 'Invalid port number'}
-
-    # Use the client's connecting IP as the host for the sub-server
-    sub_host = client_address[0]
-
-    with sub_servers_lock:
-        if sub_id in sub_servers:
-             logger.warning(f"Sub-server ID {sub_id} already registered. Updating info.")
-             # Potentially update existing entry or reject, here we update
-        sub_servers[sub_id] = {'host': sub_host, 'port': sub_port, 'client_id': client_id}
-        logger.info(f"Registered sub-server '{sub_id}' at {sub_host}:{sub_port} (Client: {client_id})")
-
-    # Also store sub-server info with the client connection data
-    with clients_lock:
-        if client_id in clients:
-            clients[client_id]['sub_server_info'] = {'id': sub_id, 'host': sub_host, 'port': sub_port}
-
-    # Send acknowledgment back
-    return {'type': 'REGISTER_ACK', 'status': 'OK', 'registered_id': sub_id}
-
-def handle_get_subservers(message: Dict[str, Any], client_id: str, client_address: Tuple[str, int]) -> Optional[Dict[str, Any]]:
-    """Handles requests for the list of available sub-servers."""
-    logger.info(f"Client {client_id} @ {client_address} requested sub-server list.")
-    with sub_servers_lock:
-        # Return a copy to avoid issues with concurrent modification
-        current_list = list(sub_servers.values())
-    return {'type': 'SUBSERVER_LIST', 'servers': current_list}
-
-def handle_echo(message: Dict[str, Any], client_id: str, client_address: Tuple[str, int]) -> Optional[Dict[str, Any]]:
-    """Handles simple echo requests."""
-    payload = message.get('payload', '')
-    logger.info(f"Echo request from {client_id}: {payload}")
-    return {'type': 'ECHO_RESPONSE', 'payload': payload}
+# Use the same logger for the wrapper for consistency if desired, or keep separate
+# wrapper_logger.addHandler(handler)
+# wrapper_logger.setLevel(logging.INFO)
 
 
-# --- Default Message Handler ---
+SERVER_HOST = '0.0.0.0'
+SERVER_PORT = 3753
+MAX_MANAGERS = 10  # Example limit
 
-def default_message_handler(message: Dict[str, Any], client_id: str, client_address: Tuple[str, int]) -> Optional[Dict[str, Any]]:
-    """Handles messages that don't match specific types."""
-    message_type = message.get('type', 'UNKNOWN')
+# Store connected manager clients (SocketWrapper instances)
+# Key: manager_address (ip, port), Value: SocketWrapper instance
+connected_managers: Dict[tuple, SocketWrapper] = {}
+managers_lock = threading.Lock()
+
+def handle_manager_message(message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Callback function to process messages received from a manager.
+    This function is executed by the SocketWrapper's receiver thread for a specific manager.
+    It should return a dictionary if a response needs to be sent back, or None otherwise.
+    """
     message_id = message.get('message_id', 'N/A')
-    logger.warning(f"Received unhandled message type '{message_type}' (ID: {message_id}) from {client_id} @ {client_address}")
-    return {'type': 'ERROR', 'code': 'UNKNOWN_TYPE', 'detail': f"Message type '{message_type}' not handled by server."}
+    client_original_id = message.get('client_original_id', 'N/A') # ID from the end-client
+    logger.info(f"MainServer received from manager (msg_id: {message_id}, client_orig_id: {client_original_id}): {message.get('type', 'Unknown type')} - {message.get('payload')}")
 
+    # Example processing: Echo back or perform some action
+    response_payload = f"MainServer processed your data: {message.get('payload')}"
 
-# --- Client Connection Handler ---
+    # The response will be sent by the SocketWrapper using the original message_id
+    # It's important that the response also includes client_original_id if the manager needs it
+    # for routing back to the specific end-client.
+    response = {
+        "type": "main_server_response",
+        "payload": response_payload,
+        "status": "success",
+        "client_original_id": client_original_id # Forward back the original client ID
+    }
+    # The message_id of the incoming message will be automatically used for the response by the wrapper.
+    return response
 
-def handle_client_connection(client_wrapper: SocketWrapper, client_address: Tuple[str, int]):
+def manager_connection_thread(manager_wrapper: SocketWrapper, manager_address: tuple):
     """
-    Manages communication with a single connected client in a separate thread.
+    Dedicated thread to handle a single manager connection.
+    The SocketWrapper's internal _receiver_loop will handle message processing.
+    This thread primarily exists to monitor the connection status and clean up.
     """
-    client_id = f"{client_address[0]}:{client_address[1]}" # Simple ID based on address
-    logger.info(f"Handling connection from {client_id}")
+    logger.info(f"Thread started for manager {manager_address}")
+    manager_wrapper.register_callback(handle_manager_message) # All messages from this manager go here
 
-    # Store client info
-    with clients_lock:
-        clients[client_id] = {'wrapper': client_wrapper, 'address': client_address, 'sub_server_info': None}
+    # The _receiver_loop is started by SocketWrapper on accept or connect.
+    # We just need to keep this thread alive as long as the wrapper is connected,
+    # or perform periodic checks/actions if needed.
+    while manager_wrapper.is_connected() and not exit_event.is_set():
+        time.sleep(1) # Keep alive, check connection status
 
-    # --- Register Message Callbacks for this Client ---
-    # We use lambdas to pass the client_id and address to the handlers
-    client_wrapper.register_callback(
-        lambda msg: handle_register_subserver(msg, client_id, client_address),
-        message_type='REGISTER_SUBSERVER'
-    )
-    client_wrapper.register_callback(
-        lambda msg: handle_get_subservers(msg, client_id, client_address),
-        message_type='GET_SUBSERVERS'
-    )
-    client_wrapper.register_callback(
-        lambda msg: handle_echo(msg, client_id, client_address),
-        message_type='ECHO_REQUEST'
-    )
-    # Register the default handler
-    client_wrapper.register_callback(
-         lambda msg: default_message_handler(msg, client_id, client_address)
-         # No message_type specified, so it becomes the default
-    )
-
-    # --- Start Receiving Messages ---
-    # The SocketWrapper needs its receiver loop started for this accepted connection
-    client_wrapper.start_receiver()
-
-    # --- Keep Thread Alive / Monitor Connection ---
-    # The receiver thread runs in the background. This thread can monitor
-    # the connection status or just wait.
-    while client_wrapper.is_connected():
-        try:
-            # You could add periodic checks or commands here if needed
-            time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Keyboard interrupt received in client handler thread.")
-            break # Allow graceful shutdown
-
-    # --- Cleanup on Disconnect ---
-    logger.info(f"Client {client_id} disconnected.")
-    with clients_lock:
-        if client_id in clients:
-            # Check if this client was registered as a sub-server
-            sub_server_info = clients[client_id].get('sub_server_info')
-            if sub_server_info:
-                sub_id_to_remove = sub_server_info.get('id')
-                with sub_servers_lock:
-                    if sub_id_to_remove and sub_id_to_remove in sub_servers:
-                        logger.info(f"Removing registered sub-server '{sub_id_to_remove}' due to client disconnect.")
-                        del sub_servers[sub_id_to_remove]
-            # Remove client from active clients list
-            del clients[client_id]
-
-    # Ensure the wrapper is closed (might already be closed by receiver loop exit)
-    client_wrapper.close()
+    logger.info(f"Manager {manager_address} disconnected or server shutting down.")
+    with managers_lock:
+        if manager_address in connected_managers:
+            del connected_managers[manager_address]
+            logger.info(f"Removed manager {manager_address} from active list. Total managers: {len(connected_managers)}")
+    manager_wrapper.close()
 
 
-# --- Main Server Loop ---
+exit_event = threading.Event()
 
-def run_server():
-    """Starts the main server listening loop."""
-    listener_socket = SocketWrapper()
-
-    if not listener_socket.bind(HOST, PORT):
-        logger.error(f"Failed to bind to {HOST}:{PORT}. Exiting.")
+def start_main_server():
+    """
+    Starts the main server to listen for manager connections.
+    """
+    server_socket = SocketWrapper(name="MainServerListener")
+    if not server_socket.bind(SERVER_HOST, SERVER_PORT):
+        logger.error(f"Failed to bind main server to {SERVER_HOST}:{SERVER_PORT}. Exiting.")
         return
 
-    listener_socket.listen()
-    logger.info(f"{SERVER_ID} listening on {HOST}:{PORT}")
+    server_socket.listen(MAX_MANAGERS)
+    logger.info(f"Main Server listening on {SERVER_HOST}:{SERVER_PORT}")
+
+    threads = []
 
     try:
-        while True:
-            # Accept new connections
-            client_wrapper, client_address = listener_socket.accept()
+        while not exit_event.is_set():
+            logger.info(f"Main Server waiting for a manager connection... Active managers: {len(connected_managers)}")
+            # Set a timeout for accept to allow periodic check of exit_event
+            server_socket.socket.settimeout(1.0)
+            try:
+                manager_wrapper, manager_address = server_socket.accept()
+            except socket.timeout:
+                continue # Timeout allows checking exit_event
+            except Exception as e:
+                if exit_event.is_set(): break
+                logger.error(f"Error during accept: {e}")
+                continue
 
-            if client_wrapper and client_address:
-                # Start a new thread to handle this client
-                # Pass the wrapper and address to the handler function
-                thread = threading.Thread(target=handle_client_connection, args=(client_wrapper, client_address), daemon=True)
-                thread.start()
-            else:
-                # Accept failed, possibly due to socket closing
-                logger.warning("Socket accept returned None, might be shutting down.")
-                # Add a small delay to prevent tight loop on errors
-                time.sleep(0.1)
-                # Consider breaking the loop if the listener socket is no longer valid
-                # if not listener_socket.is_listening(): # (Need to add an is_listening method to wrapper if needed)
-                #    break
+
+            if manager_wrapper and manager_address:
+                logger.info(f"Manager connected from {manager_address}")
+                with managers_lock:
+                    if len(connected_managers) >= MAX_MANAGERS:
+                        logger.warning(f"Max manager limit ({MAX_MANAGERS}) reached. Rejecting {manager_address}")
+                        manager_wrapper.send_to({"type": "error", "payload": "Server busy, max managers reached."})
+                        manager_wrapper.close()
+                        continue
+                    connected_managers[manager_address] = manager_wrapper
+
+                # The SocketWrapper for the accepted connection (manager_wrapper)
+                # will start its own receiver loop. We just need to manage it.
+                # No need to pass manager_wrapper to the thread, it's already started.
+                # The thread is for managing its lifecycle or custom logic if any.
+                # For now, the wrapper handles its own receiving thread.
+                # We can simplify by not needing a dedicated thread per manager here if wrapper handles all.
+                # However, if we want to monitor or manage it actively, a thread is useful.
+
+                # The manager_wrapper's receiver loop is already started by its __init__ when a socket is passed.
+                # We just need to register the callback.
+                manager_wrapper.register_callback(handle_manager_message)
+
+                # Optional: A thread to monitor this specific manager if needed beyond wrapper's scope
+                # thread = threading.Thread(target=manager_connection_thread, args=(manager_wrapper, manager_address), daemon=True)
+                # thread.start()
+                # threads.append(thread)
+
+            elif exit_event.is_set():
+                logger.info("Main server shutting down, accept loop terminating.")
+                break
 
     except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt received. Shutting down server...")
+        logger.info("Main Server shutting down (KeyboardInterrupt)...")
     except Exception as e:
-        logger.exception(f"An unexpected error occurred in the main server loop: {e}")
+        logger.error(f"Main Server encountered an error: {e}", exc_info=True)
     finally:
-        logger.info("Closing listener socket.")
-        listener_socket.close()
-        # Optionally, close all active client connections
-        with clients_lock:
-            logger.info("Closing all active client connections...")
-            for client_id, client_data in list(clients.items()): # Iterate over a copy
-                 client_data['wrapper'].close()
-        logger.info("Server shutdown complete.")
+        logger.info("Main Server initiating cleanup...")
+        exit_event.set() # Signal all components to shut down
 
+        with managers_lock:
+            for address, wrapper in list(connected_managers.items()): # Iterate over a copy
+                logger.info(f"Closing connection to manager {address}")
+                wrapper.close()
+            connected_managers.clear()
+
+        server_socket.close() # Close the listening socket
+
+        # for t in threads: # If using dedicated threads per manager
+        #     t.join(timeout=2)
+        logger.info("Main Server has shut down.")
 
 if __name__ == "__main__":
-    run_server()
+    start_main_server()
