@@ -1,342 +1,207 @@
-import socket
-import json
 import threading
-import queue
-import os
-import argparse
+import logging
 import time
+import random
+from typing import Dict, Any, Optional, Tuple
 
-HOST = '0.0.0.0'      # Where this proxy server will listen
-PORT = 65431            # Port for the local clients to connect
+# Use the updated SocketWrapper from the file (assuming it's saved as socket_wrapper.py)
+try:
+    from socket_wrapper import SocketWrapper, logger
+except ImportError:
+    print("Error: Make sure socket_wrapper.py is in the same directory.")
+    exit(1)
 
-UPSTREAM_HOST = '127.0.0.1'  # Upstream server IP
-UPSTREAM_PORT = 65432        # Upstream server port
+# --- Configuration ---
+MAIN_SERVER_HOST = '127.0.0.1' # Address of the main server
+MAIN_SERVER_PORT = 3753        # Port of the main server
+SUB_SERVER_HOST = '0.0.0.0'    # Host for this sub-server to listen on
+SUB_SERVER_ID = f"SubServer_{random.randint(1000, 9999)}" # Unique-ish ID
 
-client_id_counter = 1
-message_id_counter = 1  # New counter for message IDs
-clients = {}  # client_id -> client_socket
-request_queue = queue.Queue()
-waiting_queue = queue.Queue()  # Queue for messages waiting for responses
-response_event = threading.Event()
+# --- State ---
+main_server_connection: Optional[SocketWrapper] = None
+sub_server_listener: Optional[SocketWrapper] = None
+my_listening_port: Optional[int] = None
+connected_sub_clients: Dict[str, SocketWrapper] = {} # { sub_client_id: wrapper }
+sub_clients_lock = threading.Lock()
 
-lock = threading.Lock()
+# --- Message Handlers for Main Server Communication ---
 
-HEARTBEAT_INTERVAL = 10
-PENDING_MESSAGES = {}  # client_id -> (message, timestamp)
-RETRY_INTERVAL = 20     # seconds
-MESSAGE_TIMEOUT = 5     # seconds for waiting queue timeout
+def handle_main_server_response(message: Dict[str, Any]) -> None:
+    """Handles responses received FROM the main server."""
+    msg_type = message.get('type')
+    response_to = message.get('response_to')
+    logger.info(f"Received from Main Server (Type: {msg_type}, ResponseTo: {response_to}): {message}")
+
+    if msg_type == 'REGISTER_ACK':
+        status = message.get('status')
+        if status == 'OK':
+            registered_id = message.get('registered_id')
+            logger.info(f"Successfully registered with Main Server as '{registered_id}' on port {my_listening_port}")
+        else:
+            detail = message.get('detail')
+            logger.error(f"Failed to register with Main Server: {detail}")
+            # Consider shutdown or retry logic here
+    # Add handlers for other message types from the main server if needed
+
+# --- Message Handlers for Sub-Client Communication ---
+
+def handle_sub_client_echo(message: Dict[str, Any], sub_client_id: str) -> Optional[Dict[str, Any]]:
+    """Handles echo requests FROM clients connected TO this sub-server."""
+    payload = message.get('payload', '')
+    logger.info(f"Echo request from sub-client {sub_client_id}: {payload}")
+    return {'type': 'ECHO_RESPONSE', 'payload': f"{SUB_SERVER_ID} echoes: {payload}"}
+
+def default_sub_client_handler(message: Dict[str, Any], sub_client_id: str) -> Optional[Dict[str, Any]]:
+    """Default handler for messages from sub-clients."""
+    message_type = message.get('type', 'UNKNOWN')
+    message_id = message.get('message_id', 'N/A')
+    logger.warning(f"Received unhandled message type '{message_type}' (ID: {message_id}) from sub-client {sub_client_id}")
+    return {'type': 'ERROR', 'code': 'UNKNOWN_TYPE', 'detail': f"Message type '{message_type}' not handled by {SUB_SERVER_ID}."}
 
 
-def sendUpstream(obj, upstream_socket):
-    sendUpstreamDirect(obj, upstream_socket)
+# --- Sub-Client Connection Handler ---
 
+def handle_sub_client_connection(sub_client_wrapper: SocketWrapper, sub_client_address: Tuple[str, int]):
+    """Manages communication with a single client connected TO this sub-server."""
+    sub_client_id = f"{sub_client_address[0]}:{sub_client_address[1]}"
+    logger.info(f"Sub-server accepted connection from {sub_client_id}")
 
-def sendUpstreamDirect(obj, upstream_socket):
-    upstream_socket.send((json.dumps(obj) + "\n").encode('utf-8'))
+    with sub_clients_lock:
+        connected_sub_clients[sub_client_id] = sub_client_wrapper
 
+    # Register message handlers for this specific sub-client
+    sub_client_wrapper.register_callback(
+        lambda msg: handle_sub_client_echo(msg, sub_client_id),
+        message_type='ECHO_REQUEST'
+    )
+    sub_client_wrapper.register_callback(
+        lambda msg: default_sub_client_handler(msg, sub_client_id)
+        # Default handler
+    )
 
-def check_waiting_messages():
-    """Check for timed out messages in the waiting queue and requeue them"""
-    while True:
+    # Start the receiver loop for this sub-client
+    sub_client_wrapper.start_receiver()
+
+    # Monitor connection
+    while sub_client_wrapper.is_connected():
         time.sleep(1)
-        current_time = time.time()
-        
-        # Check if any messages in the waiting queue have timed out
-        waiting_items = []
-        while not waiting_queue.empty():
-            waiting_items.append(waiting_queue.get())
-        
-        for message, timestamp in waiting_items:
-            if current_time - timestamp >= MESSAGE_TIMEOUT:
-                # This message has timed out, put it back in the request queue
-                print(f"[Timeout] Re-queuing message with ID {message.get('message_id')} from client {message.get('client_id')}")
-                request_queue.put(message)
-                response_event.set()  # Notify the upstream sender
-            else:
-                # Message hasn't timed out yet, put it back in the waiting queue
-                waiting_queue.put((message, timestamp))
+
+    # Cleanup on disconnect
+    logger.info(f"Sub-client {sub_client_id} disconnected.")
+    with sub_clients_lock:
+        if sub_client_id in connected_sub_clients:
+            del connected_sub_clients[sub_client_id]
+    sub_client_wrapper.close()
 
 
+# --- Sub-Server Listening Loop ---
 
-
-def heartbeat_thread(upstream_socket):
-    while True:
-        time.sleep(HEARTBEAT_INTERVAL)
-        
-        # Send heartbeat to upstream
-        try:
-            heartbeat_msg = {"type": "heartbeat", "manager_id": manager_id}
-            sendUpstream(heartbeat_msg, upstream_socket)
-        except Exception as e:
-            print(f"[Heartbeat] Failed to send to upstream: {e}")
-        
-        # Send heartbeat to all clients
-        with lock:
-            for client_id, conn in list(clients.items()):
-                try:
-                    heartbeat = json.dumps({"type": "heartbeat"}).encode('utf-8')
-                    conn.send(heartbeat)
-                except Exception as e:
-                    print(f"[Heartbeat] Failed to send to client {client_id}: {e}")
-                    conn.close()
-                    clients.pop(client_id, None)
-
-
-def handle_client_connection(conn, addr, client_id):
-    print(f"Client {client_id} connected from {addr}")
-    clients[client_id] = conn
-
-    # Send the client ID
-    conn.send(json.dumps({'client_id': client_id}).encode('utf-8'))
-
+def run_sub_server_listener(listener: SocketWrapper):
+    """Listens for and accepts connections from other clients."""
+    global my_listening_port
     try:
+        # Get the dynamically assigned port
+        my_listening_port = listener.socket.getsockname()[1]
+        logger.info(f"{SUB_SERVER_ID} starting to listen on {SUB_SERVER_HOST}:{my_listening_port}")
+        listener.listen()
+
+        # --- Register with Main Server AFTER we know the port ---
+        if main_server_connection and main_server_connection.is_connected():
+            register_msg = {
+                'type': 'REGISTER_SUBSERVER',
+                'id': SUB_SERVER_ID,
+                'port': my_listening_port
+            }
+            logger.info(f"Sending registration to Main Server: {register_msg}")
+            main_server_connection.send_to(register_msg)
+        else:
+             logger.error("Cannot register with Main Server: Connection not established.")
+             # Handle this case - maybe retry connection or shut down?
+
+
+        # --- Accept Loop ---
         while True:
-            buffer = ""
-            while True:
-                chunk = conn.recv(1024).decode('utf-8')
-                if not chunk:
-                    data = buffer
-                    break
-                buffer += chunk
-                if '\n' in buffer:
-                    data, buffer = buffer.split('\n', 1)
-                    break
-
-            message = json.loads(data)
-            
-            if message.get("type") == "heartbeat":
-                continue  # Just ignore and wait for the next real message
-            
-            if(message.get("req") == "file"):
-                print(f"Recieved file from client {client_id}")
-            
-            message['client_id'] = client_id  # Ensure client_id is present
-
-            # Add the message to the queue
-            request_queue.put(message)
-            response_event.set()  # Notify the upstream sender
+            sub_client_wrapper, sub_client_address = listener.accept()
+            if sub_client_wrapper and sub_client_address:
+                thread = threading.Thread(
+                    target=handle_sub_client_connection,
+                    args=(sub_client_wrapper, sub_client_address),
+                    daemon=True
+                )
+                thread.start()
+            else:
+                logger.warning("Sub-server listener accept failed, might be shutting down.")
+                break # Exit loop if accept fails
 
     except Exception as e:
-        print(f"Client {client_id} error: {e}")
+        logger.exception(f"Error in sub-server listening loop: {e}")
     finally:
-        print(f"Client {client_id} disconnected")
-        with lock:
-            clients.pop(client_id, None)
-        conn.close()
+        logger.info("Sub-server listener shutting down.")
+        listener.close()
 
 
-def listen_for_clients():
-    global client_id_counter
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((HOST, PORT))
-    server_socket.listen()
+# --- Main Execution ---
 
-    print(f"Proxy server listening on {HOST}:{PORT}")
+def main():
+    global main_server_connection, sub_server_listener
 
-    while True:
-        conn, addr = server_socket.accept()
-        with lock:
-            client_id = client_id_counter
-            client_id_counter += 1
-        threading.Thread(target=handle_client_connection, args=(conn, addr, client_id), daemon=True).start()
+    # --- 1. Connect to Main Server ---
+    logger.info(f"Attempting to connect to Main Server at {MAIN_SERVER_HOST}:{MAIN_SERVER_PORT}")
+    main_server_connection = SocketWrapper()
+    # Register the callback *before* connecting
+    main_server_connection.register_callback(handle_main_server_response) # Default handler for main server msgs
 
+    # Connect with infinite retries, increasing delay
+    if not main_server_connection.connect(MAIN_SERVER_HOST, MAIN_SERVER_PORT, max_attempts=-1, retry_delay=5):
+        logger.error("Failed to connect to Main Server after multiple attempts. Exiting.")
+        return # Cannot proceed without main server connection
 
-def listen_upstream(upstream):
-    while True:
-        try:
-            buffer = ""
-            while True:
-                chunk = upstream.recv(1024).decode('utf-8')
-                if not chunk:
-                    data = buffer
-                    break
-                buffer += chunk
-                if '\n' in buffer:
-                    data, buffer = buffer.split('\n', 1)
-                    break
-                    
-            if not data:
-                print("Upstream connection closed.")
-                break
+    logger.info("Successfully connected to Main Server.")
+    # The receiver thread for the main server connection is now running.
 
-            response = json.loads(data)
-
-            if response.get("type") == "heartbeat":
-                continue
-
-            client_id = response.get('client_id')
-            response_id = response.get('response_id')
-            
-            # Check if this is a response to a message in the waiting queue
-            if response_id is not None:
-                # Get all items from waiting queue to check
-                waiting_items = []
-                while not waiting_queue.empty():
-                    waiting_items.append(waiting_queue.get())
-                
-                found_match = False
-                for message, timestamp in waiting_items:
-                    if message.get('message_id') == response_id:
-                        # Found the corresponding message, don't put it back
-                        print(f"Received response for message_id {response_id}")
-                        found_match = True
-                    else:
-                        # Put back messages that aren't matched
-                        waiting_queue.put((message, timestamp))
-                
-                if found_match:
-                    print(f"Removed message {response_id} from waiting queue")
-                else:
-                    print(f"Response ID {response_id} did not match any waiting messages")
-            
-            if client_id is not None:
-                with lock:
-                    PENDING_MESSAGES.pop(client_id, None)
-
-            if 'client_id' not in response:
-                if('command' in response):
-                    command = response['command']
-                    print(f"Redirecting command {command} to all clients")
-                    if command == 'shutdown':
-                        print("Received shutdown command. Notifying all clients.")
-                        with lock:
-                            for client_conn in clients.values():
-                                try:
-                                    client_conn.send(json.dumps({'command': 'shutdown'}).encode('utf-8'))
-                                except Exception as e:
-                                    print(f"Error sending shutdown to client: {e}")
-                            
-                            os._exit(0)
-                    elif command == 'report':
-                        print("Received report command. Sending status to upstream.")
-                        with lock:
-                            report = {
-                                'manager_id': response.get('manager_id'),  # use the one sent
-                                'client_count': len(clients)
-                            }
-                        sendUpstream(report, upstream)
-                        
-                    else:
-                        with lock:
-                            for client_conn in clients.values():
-                                try:
-                                    client_conn.send(json.dumps(response).encode('utf-8'))
-                                except Exception as e:
-                                    print(f"Error sending shutdown to client: {e}")
-                            
-            else:
-                # Forward regular response to the client
-                client_id = response.get('client_id')
-                with lock:
-                    client_conn = clients.get(client_id)
-                    if client_conn:
-                        client_conn.send(json.dumps(response).encode('utf-8'))
-
-        except json.JSONDecodeError:
-            print("Error: Invalid JSON from upstream")
-        except Exception as e:
-            print(f"Error in upstream listener: {e}")
-            break
-
-
-def send_to_upstream():
-    global manager_id
-    global message_id_counter
-    upstream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    upstream.connect((UPSTREAM_HOST, UPSTREAM_PORT))
-    
-    data = upstream.recv(1024).decode('utf-8')
-    try:
-        response = json.loads(data)
-        if 'manager_id' in response:
-            manager_id = response['manager_id']
-            print(f"Registered with server. Manager ID: {manager_id}")
-
-            # Now send the PC name (Windows)
-            pc_name = os.getenv("COMPUTERNAME")
-            if not pc_name:
-                print("Error: Could not get computer name.")
-                return
-
-            pc_info = {
-                'manager_id': manager_id,
-                'pc_name': pc_name
-            }
-            upstream.sendall(json.dumps(pc_info).encode('utf-8'))
-            print(f"Sent PC name: {pc_name} to server.")
-        else:
-            print("Error: Server did not send manager ID.")
-            return
-    except json.JSONDecodeError:
-        print("Error: Invalid response from server during registration.")
+    # --- 2. Start Sub-Server Listener ---
+    sub_server_listener = SocketWrapper()
+    # Bind to port 0 to let the OS choose an available ephemeral port
+    if not sub_server_listener.bind(SUB_SERVER_HOST, 0):
+        logger.error("Failed to bind sub-server listener socket. Exiting.")
+        main_server_connection.close()
         return
 
-    print(f"Connected to upstream server at {UPSTREAM_HOST}:{UPSTREAM_PORT}")
+    # Start the listener loop in a separate thread
+    listener_thread = threading.Thread(target=run_sub_server_listener, args=(sub_server_listener,), daemon=True)
+    listener_thread.start()
 
-    threading.Thread(target=listen_upstream, args=(upstream,), daemon=True).start()
-    threading.Thread(target=heartbeat_thread, args=(upstream,), daemon=True).start()
-    threading.Thread(target=check_waiting_messages, args=(), daemon=True).start()
+    # --- 3. Keep Main Thread Alive ---
+    # Keep the main thread alive to allow background threads to run
+    # and handle KeyboardInterrupt for graceful shutdown.
+    try:
+        while True:
+            # Check if main server connection is still alive
+            if not main_server_connection.is_connected():
+                logger.error("Connection to Main Server lost. Attempting to reconnect...")
+                # Implement reconnection logic here if desired, or shut down.
+                # For simplicity, we'll just log and break for now.
+                break
 
-    while True:
-        message = request_queue.get()
-        message['manager_id'] = manager_id
-        
-        # Add a unique message ID if this is a new message (not a retry)
-        if 'message_id' not in message:
-            with lock:
-                message['message_id'] = message_id_counter
-                message_id_counter += 1
-        
-        try:
-            print(f"Sending message with ID {message['message_id']} from client {message['client_id']}")
-            sendUpstream(message, upstream)
-            
-            # Add to waiting queue with current timestamp
-            waiting_queue.put((message, time.time()))
-            
-            with lock:
-                PENDING_MESSAGES[message['client_id']] = (message, time.time())
-        except Exception as e:
-            print(f"Error sending to upstream: {e}")
-        request_queue.task_done()
+            # Add other main loop tasks if needed
+            time.sleep(2)
 
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received. Shutting down...")
+    finally:
+        logger.info("Closing connections...")
+        if main_server_connection:
+            main_server_connection.close()
+        if sub_server_listener:
+            sub_server_listener.close() # This should signal the listener thread to stop accept()
 
-def force_shutdown():
-    print("Forcefully shutting down the proxy server.")
-    with lock:
-        for client_conn in clients.values():
-            try:
-                client_conn.send(json.dumps({'command': 'shutdown'}).encode('utf-8'))
-                client_conn.close()
-            except Exception as e:
-                print(f"Error force-sending shutdown: {e}")
-        clients.clear()
-    
-    os._exit(0)  # Immediately terminates the process
+        # Close connections to sub-clients
+        with sub_clients_lock:
+             for wrapper in connected_sub_clients.values():
+                 wrapper.close()
+
+        logger.info("Sub-Server / Client shutdown complete.")
+
 
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description='Manager Server for Distributed Computing')
-    parser.add_argument('--master-host', default='localhost', 
-                        help='Master server hostname')
-    parser.add_argument('--master-port', type=int, default=65432, 
-                        help='Master server port')
-    parser.add_argument('--host', default='0.0.0.0', 
-                        help='Manager server hostname')
-    parser.add_argument('--port', type=int, default=65431, 
-                        help='Manager server port')
-    
-
-    args = parser.parse_args()
-
-    HOST = args.host
-    PORT = args.port
-    
-    UPSTREAM_HOST = args.master_host
-    UPSTREAM_PORT = args.master_port
-
-    # Start the thread that listens for local clients
-    threading.Thread(target=listen_for_clients, daemon=True).start()
-
-    # Start the handler to forward messages to upstream
-    send_to_upstream()
+    main()

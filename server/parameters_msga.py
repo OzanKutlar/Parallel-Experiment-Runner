@@ -1,17 +1,22 @@
 shared_params = {
     "pop": [100, 200, 500],
-    # "repeat": [5],
+    "repeat": [30]
+}
+
+nonAdaptive_params = {
     "tournamentPer": [0, 1, 2, 3, 4],
     "stocPer": [0, 1, 2, 3, 4],
     "rankPer": [0, 1, 2, 3, 4],
-    "truncPer": [0, 1, 2, 3, 4],
-    "repeat": [30]
-    # "tournamentPer": [0, 0.25],
-    # "stocPer": [0, 0.25],
-    # "rankPer": [0, 0.25],
-    # "truncPer": [0, 0.25]
-
+    "truncPer": [0, 1, 2, 3, 4]
 }
+
+adaptive_params = {
+    "adaptive": [1]
+}
+
+shared_one = merge_objects(shared_params, nonAdaptive_params)
+
+shared_two = merge_objects(shared_params, adaptive_params)
 
 # https://www.researchgate.net/publication/228932005_Benchmark_functions_for_the_CEC'2008_special_session_and_competition_on_large_scale_global_optimization
 cec2008 = {
@@ -78,7 +83,19 @@ empty_param = {
 
 
 data_one, id_counter = generate_combined_data(
-    shared_params,
+    shared_one,
+    id_counter,
+    empty_param
+    # cec2008,
+    # cec2008_f7,
+    # cec2010,
+    # cec2013,
+    # cec2017,
+    # cec2020
+)
+
+data_two, id_counter = generate_combined_data(
+    shared_two,
     id_counter,
     empty_param
     # cec2008,
@@ -103,20 +120,25 @@ funcVal = None
 
 grouped_sets = {}
 
+data_array = data_one + data_two
 
-for obj in data_one:
+for obj in data_array:
+    
+    if 'adaptive' not in obj:
+        resultVec = [obj['tournamentPer'], obj['stocPer'], obj['rankPer'], obj['truncPer']]
 
-    resultVec = [obj['tournamentPer'], obj['stocPer'], obj['rankPer'], obj['truncPer']]
+        if(sum(resultVec) != 4):
+            continue
     
-    if(sum(resultVec) != 4):
-        continue
+        obj['tournamentPer'], obj['stocPer'], obj['rankPer'], obj['truncPer'] = obj['tournamentPer'] / 4, obj['stocPer'] / 4, obj['rankPer'] / 4, obj['truncPer'] / 4
     
-    obj['tournamentPer'], obj['stocPer'], obj['rankPer'], obj['truncPer'] = obj['tournamentPer'] / 4, obj['stocPer'] / 4, obj['rankPer'] / 4, obj['truncPer'] / 4
     obj['id'] = id_counter
     id_counter += 1
     pruned_list.append(obj)
 
 
+totalFE = sum((item['maxFE'] * item['repeat']) for item in pruned_list)
+print(totalFE)
 
 
 # print_list_as_json(pruned_list);

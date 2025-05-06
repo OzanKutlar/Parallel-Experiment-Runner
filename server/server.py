@@ -529,9 +529,10 @@ def generate_combined_data(shared_params, id_counter, *param_sets):
     return combined_data_array, id_counter
 
 
-def print_list_as_json(lst): 
-    json_str = json.dumps(lst, indent=4) 
-    print(json_str)
+def print_list_as_json(lst):
+    json_str = json.dumps(lst, indent=4)
+    with open("listJson.json", "w") as file:
+        file.write(json_str)
    
 def display_colored_array(data_array):
     return
