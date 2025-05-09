@@ -1,6 +1,7 @@
 shared_params = {
     "pop": [100, 200, 500],
-    "repeat": [30]
+    "repeat": [30],
+    "adaptive": [0]
 }
 
 nonAdaptive_params = {
@@ -23,7 +24,6 @@ cec2008 = {
     "year": ["2008"],
     "maxFE": [3_000_000],
     "func": list(range(1,7)),
-    "repeat": [25],
     "D": [1000]
 }
 
@@ -31,7 +31,6 @@ cec2008_f7 = {
     "year": ["2008"],
     "maxFE": [22_500_000],
     "func": [7],
-    "repeat": [25],
     "D": [7500]
 }
 
@@ -40,7 +39,6 @@ cec2008_f7 = {
 cec2010 = {
     "maxFE": [600_000],
     "func": list(range(1, 19)),
-    "repeat": [25],
     "year": ["2010"],
     "D": [30]
 }
@@ -49,7 +47,6 @@ cec2010 = {
 cec2013 = {
     "maxFE": [3_000_000],
     "func": list(range(1, 16)),
-    "repeat": [25],
     "year": ["2013"],
     "D": [1000]
 }
@@ -58,7 +55,6 @@ cec2013 = {
 cec2017 = {
     "maxFE": [1_000_000],
     "func": list(range(1, 29)),
-    "repeat": [25],
     "year": ["2017"],
     "D": [100]
 }
@@ -68,7 +64,6 @@ cec2017 = {
 cec2020 = { 
     "maxFE": [10_000_000],
     "func": list(range(1, 11)),
-    "repeat": [30],
     "year": ["2020"],
     "D": [20]
 }
@@ -77,7 +72,8 @@ empty_param = {
     "maxFE": [1000],
     "func": [1],
     "year": ["2020"],
-    "D": [20]
+    "D": [20],
+    "repeat": [5]
 }
 
 
@@ -85,25 +81,25 @@ empty_param = {
 data_one, id_counter = generate_combined_data(
     shared_one,
     id_counter,
-    empty_param
-    # cec2008,
-    # cec2008_f7,
-    # cec2010,
-    # cec2013,
-    # cec2017,
-    # cec2020
+    # empty_param
+    cec2008,
+    cec2008_f7,
+    cec2010,
+    cec2013,
+    cec2017,
+    cec2020
 )
 
 data_two, id_counter = generate_combined_data(
     shared_two,
     id_counter,
-    empty_param
-    # cec2008,
-    # cec2008_f7,
-    # cec2010,
-    # cec2013,
-    # cec2017,
-    # cec2020
+    # empty_param
+    cec2008,
+    cec2008_f7,
+    cec2010,
+    cec2013,
+    cec2017,
+    cec2020
 )
 
 def norm(v):
@@ -124,7 +120,7 @@ data_array = data_one + data_two
 
 for obj in data_array:
     
-    if 'adaptive' not in obj:
+    if obj['adaptive'] == 0:
         resultVec = [obj['tournamentPer'], obj['stocPer'], obj['rankPer'], obj['truncPer']]
 
         if(sum(resultVec) != 4):
@@ -138,7 +134,7 @@ for obj in data_array:
 
 
 totalFE = sum((item['maxFE'] * item['repeat']) for item in pruned_list)
-print(totalFE)
+print("Total FuncEval is : " + str(totalFE))
 
 
 # print_list_as_json(pruned_list);

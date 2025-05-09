@@ -75,228 +75,6 @@ class Experimenter:
 experimenter = Experimenter()
 
 
-class SocketServer:
-    def __init__(self, host='0.0.0.0', port=65432):
-        self.host = host
-        self.port = port
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen()
-        self.running = False
-        self.threads = []
-
-        self.manager_list = []  # List of connected managers: {'id', 'address', 'socket'}
-        self.client_id_counter = 1  # Counter for unique client IDs
-
-    def handle_client(self, client_socket, addr):
-        print(f"Connection from {addr}")
-
-        manager_id = self.client_id_counter
-        self.client_id_counter += 1
-        
-        message_responses = {}
-
-        self.manager_list.append({'id': manager_id, 'address': addr, 'socket': client_socket, 'count': 0})
-
-        client_socket.send(json.dumps({'manager_id': manager_id}).encode('utf-8'))
-
-        try:
-            data = client_socket.recv(1024).decode('utf-8')
-            pc_info = json.loads(data)
-            if 'pc_name' in pc_info:
-                for manager in self.manager_list:
-                    if manager['id'] == manager_id:
-                        manager['computer_name'] = pc_info['pc_name']
-                        break
-                print(f"Manager {manager_id} registered from PC: {pc_info['pc_name']}")
-            else:
-                print(f"Warning: Manager {manager_id} did not send a computer name.")
-        except (json.JSONDecodeError, ConnectionError) as e:
-            print(f"Error receiving PC name from Manager {manager_id}: {e}")
-
-
-        try:
-            while True:
-                try:
-                    buffer = ""
-                    while True:
-                        chunk = client_socket.recv(1024).decode('utf-8')
-                        if not chunk:
-                            data = buffer
-                            break
-                        buffer += chunk
-                        if '\n' in buffer:
-                            data, buffer = buffer.split('\n', 1)
-                            break
-                except ConnectionResetError:
-                    continue
-                if not data:
-                    break
-                try:
-                    
-                    # print(f"Got message : {data}")
-                    
-                    message = json.loads(data)
-                    
-                    if message.get("type") == "heartbeat":
-                        continue  # Just ignore and wait for the next real message
-
-                    message_id = message.get('message_id')
-                    
-                    if message_id is not None:
-                        cached_response = None
-                        if message_id in message_responses:
-                            cached_response = message_responses[message_id]
-                            print(f"Found cached response for manager {manager_id}, message_id {message_id}")
-                        
-                        # If we have a cached response, send it back immediately
-                        if cached_response:
-                            client_socket.send(json.dumps(cached_response).encode('utf-8'))
-                            continue
-                    
-                    response = {'status': 'ok', 'received': message}
-                    
-                    if 'client_id' in message:
-                        response['client_id'] = message['client_id']
-                    
-                    if 'client_count' in message:
-                        print(f"Manager {pc_info['pc_name']} has {message.get('client_count')} computers connected.")
-                        self.manager_list[manager_id - 1]['count'] = message.get('client_count')
-                        
-                    
-                    if 'req' in message:
-                        request = message['req']
-                        if request == 'get':
-                            data = experimenter.getExperiment("-1", str(message['ComputerName']));
-                            response = {
-                                'status': 'ok',
-                                'data': data,
-                                'id': data.get('id'),
-                                'client_id': message['client_id']
-                            }
-                        elif request == 'file':
-                            filename = message.get('filename')
-                            file_content_b64 = message.get('file')
-                            if('ComputerName' in message):
-                                print(f"Recieved {filename} from {message.get('ComputerName')}")
-                            else:
-                                print(f"Recieved {filename} from Client {message.get('client_id')} in Manager {pc_info['pc_name']}")
-
-                            if filename and file_content_b64:
-                                try:
-                                    # Decode the base64 content
-                                    file_data = base64.b64decode(file_content_b64)
-                                    
-                                    # Save the file
-                                    with open(filename, 'wb') as f:
-                                        f.write(file_data)
-
-                                    if('ID' in message):
-                                        experimenter.complete(str(message.get('ID')), message.get('ComputerName'))
-                                        
-                                        data = experimenter.getExperiment(str(message.get('ID')), str(message['ComputerName']));
-                                        
-                                        if('message' in data):
-                                            response = {
-                                                'command': "shutdown",
-                                                'client_id': message.get('client_id', 'unknown')
-                                            }
-                                        else:
-                                            response = {
-                                                'status': 'success',
-                                                'message': f"File '{filename}' saved successfully.",
-                                                'data': data,
-                                                'id': data.get('id'),
-                                                'client_id': message.get('client_id', 'unknown')
-                                            }
-                                        
-                                    else:
-                                        response = {
-                                            'status': 'success',
-                                            'message': f"File '{filename}' saved successfully.",
-                                            'client_id': message.get('client_id', 'unknown')
-                                        }
-                                except Exception as e:
-                                    # import traceback
-                                    # traceback.print_exc()
-                                    response = {
-                                        'status': 'error',
-                                        'message': f"Failed to save file '{filename}': {e}",
-                                        'client_id': message.get('client_id', 'unknown')
-                                    }
-                            else:
-                                response = {
-                                    'status': 'error',
-                                    'message': 'Missing filename or file data.',
-                                    'client_id': message.get('client_id', 'unknown')
-                                }
-
-                        else:
-                            response = {
-                                'status': 'error',
-                                'message': f"Unknown request: {request}",
-                                'client_id': message.get('client_id', 'unknown')
-                            }
-
-                    if message_id is not None:
-                        message_responses[message_id] = response
-                        
-                    # print(f"Sent back : {json.dumps(response)}")
-                    client_socket.send(json.dumps(response).encode('utf-8'))
-
-                except json.JSONDecodeError:
-                    client_socket.send(json.dumps({'error': 'Invalid JSON'}).encode('utf-8'))
-        finally:
-            self.manager_list = [client for client in self.manager_list if client['id'] != manager_id]
-            client_socket.close()
-            print(f"Connection closed with manager {pc_info['pc_name']} ({addr})")
-
-    def start(self):
-        self.running = True
-        print(f"Socket Server listening on {self.host}:{self.port}")
-        while self.running:
-            try:
-                client_socket, addr = self.server_socket.accept()
-                thread = threading.Thread(target=self.handle_client, args=(client_socket, addr), daemon=True)
-                thread.start()
-                self.threads.append(thread)
-            except OSError:
-                break
-
-    def sendCommand(self, command):
-        print(f"Sending the command '{command}' to all the managers.")
-
-        # Notify all managers about shutdown
-        for manager in self.manager_list:
-            try:
-                # print(f"Sending command to manager {manager['id']}")
-                manager['socket'].send(json.dumps({'command': command}).encode('utf-8'))
-            except Exception as e:
-                print(f"Failed to send {command} to manager {manager['id']}: {e}")
-
-
-    def stop(self):
-        print("Stopping the socket server...")
-
-        # Notify all managers about shutdown
-        for manager in self.manager_list:
-            try:
-                print(f"Shutting down manager {manager['id']}")
-                manager['socket'].send(json.dumps({'command': 'shutdown'}).encode('utf-8'))
-            except Exception as e:
-                print(f"Failed to send shutdown to manager {manager['id']}: {e}")
-
-        self.running = False
-        self.server_socket.close()
-        for thread in self.threads:
-            thread.join(timeout=1)
-
-        print("Socket Server stopped.")
-
-    def run_in_background(self):
-        server_thread = threading.Thread(target=self.start, daemon=True)
-        server_thread.start()
 
 
 
@@ -629,9 +407,6 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=start_server, args=(server,), daemon=True)
     server_thread.start()
     
-    socket_server = SocketServer()
-    
-    socket_server.run_in_background()
 
     try:
         while True:
@@ -651,10 +426,6 @@ if __name__ == "__main__":
                         print(f"Index {index+1} is out of bounds. Array length is 1-{len(experimenter.data_array)}.")
                 except (IndexError, ValueError):
                     print("Invalid command format. Use 'print x', where x is a valid index.")
-            elif user_input.startswith('file '):
-                socket_server.sendCommand(user_input)
-            elif user_input.startswith('report'):
-                socket_server.sendCommand(user_input)
             elif user_input.startswith('reset '):
                 try:
                     indices = user_input.split()[1]
@@ -687,7 +458,7 @@ if __name__ == "__main__":
         server.shutdown()
         server.server_close()
         server_thread.join()
-        socket_server.stop()
+        # socket_server.stop()
         print("Server stopped.")
 
 

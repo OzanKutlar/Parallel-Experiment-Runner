@@ -1,6 +1,7 @@
 <?php
 if (isset($_GET['data'])) {
     $data = json_decode($_GET['data'], true);
+    $url = $_GET['url'];
     $dataId = $data['id']; // Extract data.id
     echo '<pre class="data-display">';
     print_r($data);
@@ -88,8 +89,8 @@ if (isset($_GET['data'])) {
                 return;
             }
             
-            // const serverUrl = "http://" + window.location.hostname + ":3753/reset";
-            const serverUrl = "http://evolab:33000/reset";
+            const serverUrl = "http://" + <?php echo $url ?> + ":3753/reset";
+            // const serverUrl = "http://evolab:3753/reset";
             const headers = {
                 'index': dataId
             };

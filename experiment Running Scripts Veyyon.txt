@@ -10,6 +10,8 @@ Otomatik Kapama scripti :
 Matlab run example :
 matlab -sd "C:\Users\exam\PlatEMO\PlatEMO" -r "GetFromServer('10.1.36.81', '3753', 5)"
 
+powershell -Command cd "C:\Users\Ozan\PlatEMO\PlatEMO"; matlab -batch "GetFromServer('127.0.0.1', 5);"
+
 .exe run Example : 
 powershell -Command cd "C:\Users\Exam\PlatEMO\PlatEMO"; .\test.exe --host "10.1.51.110"
 
