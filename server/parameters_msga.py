@@ -29,9 +29,9 @@ cec2008 = {
 
 cec2008_f7 = {
     "year": ["2008"],
-    "maxFE": [22_500_000],
+    "maxFE": [3_000_000],
     "func": [7],
-    "D": [7500]
+    "D": [1000]
 }
 
 
@@ -135,6 +135,34 @@ for obj in data_array:
 
 totalFE = sum((item['maxFE'] * item['repeat']) for item in pruned_list)
 print("Total FuncEval is : " + str(totalFE))
+
+cutOffArea = 3163
+
+def calculateCompletion(year, cutOff):
+    totalFE = sum(
+        item['maxFE'] * item['repeat']
+        for item in pruned_list
+        if item['year'] == year
+    )
+
+    completedFE = sum(
+        item['maxFE'] * item['repeat']
+        for item in pruned_list
+        if item['year'] == year and item['id'] < cutOff
+    )
+
+    if totalFE == 0:
+        percentage = 0
+    else:
+        percentage = (completedFE / totalFE) * 100
+
+    print(f"CEC{year} Completion: {percentage:.2f}%")
+
+calculateCompletion('2008', cutOffArea)
+calculateCompletion('2010', cutOffArea)
+calculateCompletion('2013', cutOffArea)
+calculateCompletion('2017', cutOffArea)
+calculateCompletion('2020', cutOffArea)
 
 
 # print_list_as_json(pruned_list);

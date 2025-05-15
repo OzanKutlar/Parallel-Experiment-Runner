@@ -39,6 +39,7 @@ class Experimenter:
                 self.completed_array[int(ID)] = False
                 
         if last < len(self.data_array):
+            self.data_array[last]['Taken At'] = time.strftime('%Y-%m-%d %H:%M:%S')
             response_data = self.data_array[last]
             if last == len(self.givenToPC):
                 self.givenToPC.append(computer_name)
@@ -62,6 +63,7 @@ class Experimenter:
     def complete(self, ID, computer_name):
         self.stateLog("Finished", int(ID), computer_name)
         print("ID " + ID + " is finished.")
+        self.data_array[int(ID) - 1]['Completed At'] = time.strftime('%Y-%m-%d %H:%M:%S')
         self.completed_array[int(ID) - 1] = True
 
     def reset(self, index):
@@ -348,19 +350,37 @@ def start_server(server):
     print(f"Server running on {server.server_address[0]}:{server.server_address[1]}")
     server.serve_forever()
 
+def check_missing_files(directory, max_number):
+    missing_count = 0
+    lastNonMissing = -1
+    for i in range(1, max_number + 1):
+        file_name = f"exp-{i}.mat"
+        file_path = os.path.join(directory, file_name)
+        if not os.path.isfile(file_path):
+            # print(f"Missing: {file_name}")
+            missing_count += 1
+        else:
+            lastNonMissing = i
+       
+    print(f"Last Index: {lastNonMissing}")
+    
+    experimenter.data_index.append(lastNonMissing)
+    if(experimenter.data_index[-1] < 0):
+        experimenter.data_index[-1] = 0
+    for i in range(1,experimenter.data_index[-1] + 1):
+        experimenter.stateLog("Finished", i, "PRE")
+        experimenter.givenToPC.append("PRE")
+        experimenter.completed_array.append(True)
+    
+    for i in range(1, lastNonMissing):
+        file_name = f"exp-{i}.mat"
+        file_path = os.path.join(directory, file_name)
+        if not os.path.isfile(file_path):
+            # print(f"Missing: {file_name}")
+            experimenter.reset(i)
 
 if __name__ == "__main__":
     print("\033[2J\033[H", end="")
-    if len(sys.argv) > 1:
-        experimenter.data_index.append(int(sys.argv[1]) - 1)
-        if(experimenter.data_index[-1] < 0):
-            experimenter.data_index[-1] = 0
-        for i in range(1,experimenter.data_index[-1] + 1):
-            experimenter.stateLog("Finished", i, "PRE")
-            experimenter.givenToPC.append("PRE")
-            experimenter.completed_array.append(True)
-    else:
-        experimenter.data_index.append(0)
     # print(experimenter.data_index[-1])
     id_counter = 1
     
@@ -401,6 +421,26 @@ if __name__ == "__main__":
     exec(code)  # Execute the script dynamically
     experimenter.data_array = data_array
 
+    if len(sys.argv) > 1:
+        arg = sys.argv[1]
+
+        if arg.lower() == "cont":
+            check_missing_files("./data/", len(data_array) + 1)
+        else:
+            try:
+                index = int(arg) - 1
+                if index < 0:
+                    index = 0
+                experimenter.data_index.append(index)
+                for i in range(1, index + 1):
+                    experimenter.stateLog("Finished", i, "PRE")
+                    experimenter.givenToPC.append("PRE")
+                    experimenter.completed_array.append(True)
+            except ValueError:
+                print(f"Invalid argument: {arg}. Must be 'cont' or a positive integer.")
+                experimenter.data_index.append(0)
+    else:
+        experimenter.data_index.append(0)
     
     server = HTTPServer((host, port), HTTPHandler)
 

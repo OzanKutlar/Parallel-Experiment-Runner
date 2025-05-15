@@ -425,6 +425,7 @@
     <script>
         let lastLog = -1;
         let lastState = -1;
+        let allStates = [];
         let currentPage = 1;
         let boxesPerPage = 100;
         let totalPages = 1;
@@ -714,7 +715,8 @@
         }
         
         function changeStates(states) {
-            states.forEach(state => {
+			allStates = [...allStates, ...states]
+            allStates.forEach(state => {
                 changeBox(state);
                 lastState = state.ID;
             });
