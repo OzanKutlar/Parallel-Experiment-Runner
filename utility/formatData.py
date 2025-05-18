@@ -1,138 +1,93 @@
-function formatData()
-    % Directory of experiment data
-    dataDir = '../server/data/';
-    maxNumber = 1000; % Adjust this based on how many files you expect
+import os
+import scipy.io
+import pandas as pd
+import numpy as np
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.styles import Alignment
+from openpyxl.utils import get_column_letter
 
-    % Initialize structure to hold all data
-    allResults = struct();
+# Configuration
+directory = "../server/data"
+max_number = 1000  # adjust based on how many exp files you have
+output_excel = "experiment_summary.xlsx"
 
-    % Loop through all experiment files
-    for i = 1:maxNumber
-        fileName = sprintf('exp-%d.mat', i);
-        filePath = fullfile(dataDir, fileName);
-        if ~isfile(filePath)
-            continue;
-        end
+# Gather data grouped by (year, func)
+grouped_data = {}
 
-        % Load the .mat file
-        s = load(filePath);
-        data = s.data;
+for i in range(1, max_number + 1):
+    file_name = f"exp-{i}.mat"
+    file_path = os.path.join(directory, file_name)
 
-        % Extract identifiers
-        cecYear = data.year;
-        funcID = data.func;
+    if not os.path.exists(file_path):
+        continue
 
-        % Create key for indexing results
-        key = sprintf('CEC%s_Func%d', cecYear, funcID);
+    mat = scipy.io.loadmat(file_path)
+    data = mat['data']
 
-        if data.adaptive
-            comboKey = 'adaptive';
-        else
-            selectionMethods = data.selectionMethods;
-            comboKey = sprintf('[%.2f_%.2f_%.2f_%.2f]', selectionMethods);
-        end
+    # Flatten structured array if necessary
+    if isinstance(data, np.ndarray) and data.dtype.names:
+        data = data[0, 0]
 
-        % Initialize if not exist
-        if ~isfield(allResults, key)
-            allResults.(key).fitnessMatrix = containers.Map();
-            allResults.(key).success_1e8 = containers.Map();
-            allResults.(key).success_1e6 = containers.Map();
-            allResults.(key).success_1e4 = containers.Map();
-        end
+    year = str(data['year'][0])
+    func = int(data['func'][0][0])
+    repeats = int(data['repeat'][0][0])
+    selection_methods = str(data['selectionMethods']) if data['adaptive'] == 0 else "Adaptive"
+    final_fitness = data['finalFitness']
 
-        % Extract best fitness from each repetition
-        numRepeats = length(data.finalFitness);
-        bestFitness = zeros(1, numRepeats);
-        for r = 1:numRepeats
-            fitnesses = data.finalFitness{r};
-            if ~isempty(fitnesses)
-                bestFitness(r) = min(fitnesses); % assuming minimization
-            else
-                bestFitness(r) = NaN;
-            end
-        end
+    # Extract the best fitness value from each repetition
+    best_fitness_per_repeat = []
+    for j in range(repeats):
+        fitness_values = final_fitness[0][j].flatten()
+        if fitness_values.size > 0:
+            best_fitness_per_repeat.append(min(fitness_values))
+        else:
+            best_fitness_per_repeat.append(None)
 
-        % Store best fitness matrix (rows = repeats)
-        if ~isKey(allResults.(key).fitnessMatrix, comboKey)
-            allResults.(key).fitnessMatrix(comboKey) = [];
-        end
-        mat = allResults.(key).fitnessMatrix(comboKey);
-        mat = [mat; bestFitness]; % Append new row
-        allResults.(key).fitnessMatrix(comboKey) = mat;
+    key = (year, func)
+    grouped_data.setdefault(key, []).append({
+        'selection_method': selection_methods,
+        'best_fitnesses': best_fitness_per_repeat
+    })
 
-        % Compute success ratios for 3 thresholds
-        thresholds = [1e-8, 1e-6, 1e-4];
-        for tIdx = 1:3
-            th = thresholds(tIdx);
-            success = sum(bestFitness < th) / numRepeats;
+# Create Excel Workbook
+wb = Workbook()
+ws = wb.active
+ws.title = "Experiment Results"
 
-            thStr = sprintf('1e%d', -log10(th));
-            mapName = ['success_' thStr];
-            if ~isfield(allResults.(key), mapName)
-                allResults.(key).(mapName) = containers.Map();
-            end
-            m = allResults.(key).(mapName);
+row_pointer = 1
+
+for (year, func), experiments in grouped_data.items():
+    title = f"CEC{year}_F{func}"
+    num_repeats = len(experiments[0]['best_fitnesses'])
 
 
-            if ~isKey(m, comboKey)
-                m(comboKey) = [];
-            end
-            m(comboKey) = [m(comboKey), success];
-            allResults.(key).(mapName) = m;
-        end
-    end
 
-    % Output results in ordered format
-    selectionCombos = generateSelectionCombos();
+    # Create DataFrame
+    columns = [f"{m['selection_method']}" for m in experiments]
+    df = pd.DataFrame(index=[f"Repeat {i+1}" for i in range(num_repeats)])
     
-    fields = fieldnames(allResults);
-    for f = 1:length(fields)
-        funcKey = fields{f};
-        res = allResults.(funcKey);
-        
-        fprintf('Results for %s\n', funcKey);
+    
+    for e in experiments:
+        df[e["selection_method"]] = e["best_fitnesses"]
 
-        % Fitness Matrix
-        fprintf('Fitness Matrix (repeats x combinations):\n');
-        fitnessMat = [];
-        for c = 1:length(selectionCombos)
-            combo = selectionCombos{c};
-            if isKey(res.fitnessMatrix, combo)
-                rows = res.fitnessMatrix(combo);
-                fitnessMat = [fitnessMat; mean(rows,1)];
-            else
-                fitnessMat = [fitnessMat; NaN(1,5)];
-            end
-        end
-        disp(fitnessMat');
+    # Merge header and write title
+    start_col = 1
+    end_col = start_col + df.shape[1]
+    ws.merge_cells(start_row=row_pointer, start_column=start_col, end_row=row_pointer, end_column=end_col)
+    cell = ws.cell(row=row_pointer, column=start_col)
+    cell.value = title
+    cell.alignment = Alignment(horizontal='center')
+    row_pointer += 1
 
-        % Success ratios
-        thresholds = {'success_1e8', 'success_1e6', 'success_1e4'}; % already valid
-        for t = 1:length(thresholds)
-            vec = zeros(1, length(selectionCombos));
-            for c = 1:length(selectionCombos)
-                combo = selectionCombos{c};
-                m = res.(thresholds{t});
-                if isKey(m, combo)
-                    vec(c) = mean(m(combo));
-                else
-                    vec(c) = NaN;
-                end
-            end
-            fprintf('Success Ratio (%s):\n', thresholds{t});
-            disp(vec);
-        end
-        fprintf('\n--------------------\n');
-    end
-end
+    # Write DataFrame
+    for r in dataframe_to_rows(df.reset_index(), index=False, header=True):
+        for c_idx, value in enumerate(r, start=1):
+            ws.cell(row=row_pointer, column=c_idx, value=value)
+        row_pointer += 1
 
-function combos = generateSelectionCombos()
-    % Generates all 16 selection method combinations + 'adaptive'
-    combos = {};
-    for i = 1:16
-        b = dec2bin(i-1, 4) - '0';
-        combo = sprintf('[%.2f_%.2f_%.2f_%.2f]', b);
-        combos{end+1} = combo;
-    end
-    combos{end+1} = 'adaptive'; % Add adaptive at the end
-end
+    row_pointer += 2  # spacing between tables
+
+# Save workbook
+wb.save(output_excel)
+print(f"Excel report saved to: {output_excel}")
