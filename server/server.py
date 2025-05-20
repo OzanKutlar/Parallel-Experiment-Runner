@@ -63,8 +63,15 @@ class Experimenter:
     def complete(self, ID, computer_name):
         self.stateLog("Finished", int(ID), computer_name)
         print("ID " + ID + " is finished.")
+        
+        index = int(ID) - 1
+        
         self.data_array[int(ID) - 1]['Completed At'] = time.strftime('%Y-%m-%d %H:%M:%S')
-        self.completed_array[int(ID) - 1] = True
+        
+        if index >= len(self.completed_array):
+            self.completed_array.extend([False] * (index + 1 - len(self.completed_array)))
+        
+        self.completed_array[index] = True
 
     def reset(self, index):
         self.stateLog("Reset", index + 1)
@@ -120,7 +127,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             last_log = int(self.headers.get('lastLog', len(experimenter.logs) - 6))
             # print(f"Request came for a log with lastlog : {last_log}")
             if(last_log <= len(experimenter.logs) - 6):
-                relevant_logs = experimenter.logs[-5:]
+                relevant_logs = experimenter.logs[-30:]
             else:
                 relevant_logs = experimenter.logs[last_log+1:last_log+5]
             
