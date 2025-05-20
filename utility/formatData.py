@@ -9,7 +9,7 @@ from openpyxl.utils import get_column_letter
 
 # Configuration
 directory = "../server/data"
-max_number = 1000  # adjust based on how many exp files you have
+max_number = 4000  # adjust based on how many exp files you have
 output_excel = "experiment_summary.xlsx"
 
 # Gather data grouped by (year, func)
