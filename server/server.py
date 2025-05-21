@@ -33,7 +33,7 @@ class Experimenter:
             if(not self.completed_array[int(ID) - 1]):
                 self.stateLog("Reset", int(ID))
                 print(f"Resetting data {int(ID) + 1} for {computer_name} due to new request.")
-                self.log(f"Reset index {int(ID) + 1} by {computer_name}")
+                log(f"Reset index {int(ID) + 1} by {computer_name}")
                 self.data_index.append(int(ID))
                 self.givenToPC[int(ID)] = 'Reset'
                 self.completed_array[int(ID)] = False
