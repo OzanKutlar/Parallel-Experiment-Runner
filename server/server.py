@@ -497,6 +497,33 @@ if __name__ == "__main__":
                             print(f"Index {index + 1} is out of bounds. Array length is 1-{len(experimenter.givenToPC)}.")
                 except (IndexError, ValueError):
                     print("Invalid command format. Use 'reset x' or 'reset x:y', where x and y are valid indices.")
+            elif user_input.startswith('complete '):
+                try:
+                    indices_str = user_input.split()[1]
+                    print(f"Marking indices as complete: {indices_str}")
+
+                    if ':' in indices_str:
+                        start_str, end_str = indices_str.split(':')
+                        start_1_based = int(start_str)
+                        end_1_based = int(end_str)
+
+                        if 1 <= start_1_based <= len(experimenter.data_array) and \
+                           1 <= end_1_based <= len(experimenter.data_array) and \
+                           start_1_based <= end_1_based:
+                            for i_1_based in range(start_1_based, end_1_based + 1):
+                                experimenter.complete(str(i_1_based), "Terminal")
+                                log(f"Marked index {i_1_based} as complete from terminal.")
+                        else:
+                            print(f"Invalid range. Ensure both indices are within 1-{len(experimenter.data_array)} and start <= end.")
+                    else:
+                        index_1_based = int(indices_str)
+                        if 1 <= index_1_based <= len(experimenter.data_array):
+                            experimenter.complete(str(index_1_based), "Terminal")
+                            log(f"Marked index {index_1_based} as complete from terminal.")
+                        else:
+                            print(f"Index {index_1_based} is out of bounds. Array length is 1-{len(experimenter.data_array)}.")
+                except (IndexError, ValueError):
+                    print("Invalid command format. Use 'complete x' or 'complete x:y', where x and y are valid indices.")
 
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt detected. Shutting down the server...")
