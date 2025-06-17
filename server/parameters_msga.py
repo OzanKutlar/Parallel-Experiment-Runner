@@ -68,6 +68,15 @@ cec2020 = {
     "D": [20]
 }
 
+cec2008_f7_2 = {
+    "year": ["2008"],
+    "maxFE": [3_000_000],
+    "func": [7],
+    "D": [1000],
+    "repeat": [5],
+    "repeatIndex": [1,2,3,4,5,6]
+}
+
 empty_param = {
     "maxFE": [1000],
     "func": [1],
@@ -102,6 +111,12 @@ data_two, id_counter = generate_combined_data(
     cec2020
 )
 
+data_three, id_counter = generate_combined_data(
+    shared_two,
+    id_counter,
+    cec2008_f7_2
+)
+
 def norm(v):
     v = np.array(v)
     norm = np.linalg.norm(v)
@@ -116,7 +131,7 @@ funcVal = None
 
 grouped_sets = {}
 
-data_array = data_one + data_two
+data_array = data_one + data_two + data_three
 
 for obj in data_array:
     
