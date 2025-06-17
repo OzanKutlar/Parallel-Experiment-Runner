@@ -1,0 +1,31 @@
+2025-05-22 07:52:29,846 - INFO - Script started.
+2025-05-22 07:52:29,846 - INFO - Script path: /app/utility/formatData.py
+2025-05-22 07:52:29,846 - INFO - Data directory: /app/utility/../server/data
+2025-05-22 07:52:29,846 - INFO - Output Excel file: /app/utility/experiment_summary.xlsx
+2025-05-22 07:52:29,846 - INFO - Log file: /app/utility/formatData.log
+2025-05-22 07:52:29,847 - INFO - Will process up to 10 experiment files based on --max_files argument.
+2025-05-22 07:52:29,847 - INFO - Starting data processing loop for files up to exp-10.mat...
+2025-05-22 07:52:29,847 - INFO - Attempting to process file: /app/utility/../server/data/exp-1.mat
+2025-05-22 07:52:29,847 - WARNING - File not found: /app/utility/../server/data/exp-1.mat. Skipping.
+2025-05-22 07:52:29,847 - INFO - Attempting to process file: /app/utility/../server/data/exp-2.mat
+2025-05-22 07:52:29,847 - WARNING - File not found: /app/utility/../server/data/exp-2.mat. Skipping.
+2025-05-22 07:52:29,847 - INFO - Attempting to process file: /app/utility/../server/data/exp-3.mat
+2025-05-22 07:52:29,847 - WARNING - File not found: /app/utility/../server/data/exp-3.mat. Skipping.
+2025-05-22 07:52:29,848 - INFO - Attempting to process file: /app/utility/../server/data/exp-4.mat
+2025-05-22 07:52:29,848 - WARNING - File not found: /app/utility/../server/data/exp-4.mat. Skipping.
+2025-05-22 07:52:29,848 - INFO - Attempting to process file: /app/utility/../server/data/exp-5.mat
+2025-05-22 07:52:29,848 - WARNING - File not found: /app/utility/../server/data/exp-5.mat. Skipping.
+2025-05-22 07:52:29,848 - INFO - Attempting to process file: /app/utility/../server/data/exp-6.mat
+2025-05-22 07:52:29,848 - WARNING - File not found: /app/utility/../server/data/exp-6.mat. Skipping.
+2025-05-22 07:52:29,848 - INFO - Attempting to process file: /app/utility/../server/data/exp-7.mat
+2025-05-22 07:52:29,848 - WARNING - File not found: /app/utility/../server/data/exp-7.mat. Skipping.
+2025-05-22 07:52:29,848 - INFO - Attempting to process file: /app/utility/../server/data/exp-8.mat
+2025-05-22 07:52:29,848 - WARNING - File not found: /app/utility/../server/data/exp-8.mat. Skipping.
+2025-05-22 07:52:29,848 - INFO - Attempting to process file: /app/utility/../server/data/exp-9.mat
+2025-05-22 07:52:29,848 - WARNING - File not found: /app/utility/../server/data/exp-9.mat. Skipping.
+2025-05-22 07:52:29,848 - INFO - Attempting to process file: /app/utility/../server/data/exp-10.mat
+2025-05-22 07:52:29,848 - WARNING - File not found: /app/utility/../server/data/exp-10.mat. Skipping.
+2025-05-22 07:52:29,848 - INFO - Data processing loop finished.
+2025-05-22 07:52:29,849 - INFO - Starting Excel report generation...
+2025-05-22 07:52:29,859 - INFO - Excel report successfully saved to: /app/utility/experiment_summary.xlsx
+2025-05-22 07:52:29,859 - INFO - Script finished.
