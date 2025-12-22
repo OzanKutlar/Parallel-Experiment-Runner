@@ -226,7 +226,7 @@
             padding: 20px;
             display: flex;
             flex-direction: column;
-            min-height: 300px;
+            min-height: 250px;
         }
 
         .activity-header {
@@ -259,11 +259,13 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            transition: background-color 0.2s;
+            transition: all 0.2s;
+            cursor: pointer;
         }
 
         .activity-item:hover {
             background-color: #3a3d3f;
+            transform: translateX(3px);
         }
 
         .activity-item.taken {
@@ -272,6 +274,10 @@
 
         .activity-item.finished {
             border-left-color: var(--success);
+        }
+
+        .activity-item.running {
+            border-left-color: var(--accent-orange);
         }
 
         .activity-content {
@@ -399,6 +405,130 @@
             color: var(--text-secondary);
         }
 
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: var(--bg-secondary);
+            border: 2px solid var(--accent-orange);
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--accent-orange);
+        }
+
+        .modal-header h2 {
+            color: var(--accent-orange);
+            font-size: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: var(--accent-orange);
+        }
+
+        .modal-body {
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+        }
+
+        .property-item {
+            display: flex;
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            transition: background-color 0.2s;
+        }
+
+        .property-item:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        .property-item:last-child {
+            border-bottom: none;
+        }
+
+        .property-key {
+            color: var(--accent-orange);
+            font-weight: 600;
+            min-width: 150px;
+            margin-right: 15px;
+        }
+
+        .property-value {
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+
+        .modal-footer {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-danger {
+            background-color: var(--error);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #a03331;
+        }
+
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -433,13 +563,13 @@
             opacity: 0.5;
         }
 
-        @keyframes fadeIn {
+        @keyframes fadeInItem {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         .activity-item, .log-entry {
-            animation: fadeIn 0.3s ease;
+            animation: fadeInItem 0.3s ease;
         }
     </style>
 </head>
@@ -514,6 +644,19 @@
 
             <div class="activity-section">
                 <div class="activity-header">
+                    <h3><i class="fas fa-cog"></i> Currently Running</h3>
+                    <span style="color: var(--text-secondary); font-size: 12px;" id="currentlyRunningCount">0 items</span>
+                </div>
+                <div class="activity-list" id="currentlyRunningList">
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No experiments running</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="activity-section">
+                <div class="activity-header">
                     <h3><i class="fas fa-play-circle"></i> Experiments Taken</h3>
                     <span style="color: var(--text-secondary); font-size: 12px;" id="takenCount">0 items</span>
                 </div>
@@ -565,6 +708,29 @@
         </div>
     </div>
 
+    <!-- Modal for experiment details -->
+    <div id="experimentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Experiment Details</h2>
+                <button class="modal-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Properties will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="resetExperiment()">
+                    <i class="fas fa-redo"></i> Reset Experiment
+                </button>
+                <button class="btn" onclick="closeModal()">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let serverIp = localStorage.getItem('serverIp') || 'localhost';
         let lastLog = -1;
@@ -572,6 +738,7 @@
         let allStates = [];
         let totalExperiments = 0;
         let isConnected = false;
+        let currentExperimentId = null;
 
         document.getElementById('serverIpInput').value = serverIp;
 
@@ -586,7 +753,6 @@
         }
 
         function showNotification(message) {
-            // Simple notification in log
             addLogEntry({ Text: message, time: new Date().toLocaleTimeString() });
         }
 
@@ -655,7 +821,6 @@
             const running = [];
             const waiting = [];
 
-            // Process all states
             const latestStates = {};
             allStates.forEach(state => {
                 latestStates[state.index] = state;
@@ -672,12 +837,10 @@
                 }
             });
 
-            // Update counts
             document.getElementById('runningCount').textContent = running.length;
             document.getElementById('completedCount').textContent = finished.length;
             document.getElementById('waitingCount').textContent = totalExperiments - finished.length - running.length;
 
-            // Update progress
             const percent = totalExperiments > 0 ? Math.round((finished.length / totalExperiments) * 100) : 0;
             const circumference = 408.41;
             const offset = circumference - (percent / 100) * circumference;
@@ -687,10 +850,8 @@
             document.getElementById('progressRunning').textContent = running.length;
             document.getElementById('progressRemaining').textContent = totalExperiments - finished.length - running.length;
 
-            // Update taken list
+            updateActivityList('currentlyRunningList', running.reverse(), 'running', 'currentlyRunningCount');
             updateActivityList('takenList', taken.reverse(), 'taken', 'takenCount');
-            
-            // Update finished list
             updateActivityList('finishedList', finished.reverse(), 'finished', 'finishedCount');
         }
 
@@ -701,27 +862,121 @@
             countEl.textContent = items.length + ' items';
 
             if (items.length === 0) {
+                let emptyText = 'No experiments ';
+                if (type === 'running') emptyText += 'running';
+                else if (type === 'taken') emptyText += 'taken yet';
+                else emptyText += 'finished yet';
+                
                 listEl.innerHTML = `
                     <div class="empty-state">
                         <i class="fas fa-inbox"></i>
-                        <p>No experiments ${type === 'taken' ? 'taken' : 'finished'} yet</p>
+                        <p>${emptyText}</p>
                     </div>
                 `;
                 return;
             }
 
-            listEl.innerHTML = items.map(item => `
-                <div class="activity-item ${type}">
-                    <div class="activity-content">
-                        <span class="activity-id">#${item.index}</span>
-                        <span>${type === 'taken' ? 'Running on' : 'Finished by'} <strong>${item.sentTo}</strong></span>
+            listEl.innerHTML = items.map(item => {
+                let statusText = '';
+                let statusClass = '';
+                let iconClass = '';
+                
+                if (type === 'running') {
+                    statusText = 'Running';
+                    statusClass = 'running';
+                    iconClass = 'fa-cog fa-spin';
+                } else if (type === 'taken') {
+                    statusText = 'Running';
+                    statusClass = 'running';
+                    iconClass = 'fa-cog fa-spin';
+                } else {
+                    statusText = 'Done';
+                    statusClass = 'finished';
+                    iconClass = 'fa-check';
+                }
+                
+                return `
+                    <div class="activity-item ${type}" onclick="showExperimentDetails(${item.index})">
+                        <div class="activity-content">
+                            <span class="activity-id">#${item.index}</span>
+                            <span>${type === 'finished' ? 'Finished by' : 'Running on'} <strong>${item.sentTo}</strong></span>
+                        </div>
+                        <div class="status-badge ${statusClass}">
+                            <i class="fas ${iconClass}"></i>
+                            ${statusText}
+                        </div>
                     </div>
-                    <div class="status-badge ${type === 'taken' ? 'running' : 'finished'}">
-                        <i class="fas ${type === 'taken' ? 'fa-cog fa-spin' : 'fa-check'}"></i>
-                        ${type === 'taken' ? 'Running' : 'Done'}
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
+        }
+
+        function showExperimentDetails(experimentId) {
+            currentExperimentId = experimentId;
+            
+            fetch(`http://${serverIp}:3753/info`, {
+                headers: { 'index': experimentId }
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('modalTitle').textContent = `Experiment #${experimentId} Details`;
+                
+                const modalBody = document.getElementById('modalBody');
+                modalBody.innerHTML = '';
+                
+                for (const [key, value] of Object.entries(data)) {
+                    const propertyItem = document.createElement('div');
+                    propertyItem.className = 'property-item';
+                    
+                    const propertyKey = document.createElement('div');
+                    propertyKey.className = 'property-key';
+                    propertyKey.textContent = key + ':';
+                    
+                    const propertyValue = document.createElement('div');
+                    propertyValue.className = 'property-value';
+                    propertyValue.textContent = typeof value === 'object' ? JSON.stringify(value, null, 2) : value;
+                    
+                    propertyItem.appendChild(propertyKey);
+                    propertyItem.appendChild(propertyValue);
+                    modalBody.appendChild(propertyItem);
+                }
+                
+                document.getElementById('experimentModal').classList.add('active');
+            })
+            .catch(error => {
+                console.error("Error fetching experiment details:", error);
+                showNotification("Failed to load experiment details");
+            });
+        }
+
+        function closeModal() {
+			document.getElementById('experimentModal').classList.remove('active');
+            currentExperimentId = null;
+        }
+
+        function resetExperiment() {
+            if (!currentExperimentId) return;
+
+            if(!confirm(`Are you sure you want to reset experiment #${currentExperimentId}?`)) {
+                return;
+            }
+
+            fetch(`http://${serverIp}:3753/reset`, {
+                headers: { 'index': currentExperimentId }
+            })
+            .then(response => {
+                if (response.ok) {
+                    showNotification(`Experiment #${currentExperimentId} sent to reset queue`);
+                    closeModal();
+                    // Refresh data shortly after to reflect changes
+                    setTimeout(fetchAll, 500);
+                } else {
+                    showNotification(`Error: Server returned ${response.status}`);
+                }
+            })
+            .catch(error => {
+                console.error("Error resetting:", error);
+                showNotification(`Error resetting experiment: ${error.message}`);
+            });
         }
 
         function addLogEntry(log) {
@@ -736,6 +991,7 @@
             const entry = document.createElement('div');
             entry.className = 'log-entry';
             
+            // Handle time format if it exists in log, else use current
             const time = log.time ? log.time.split(' ')[1] : new Date().toLocaleTimeString();
             
             entry.innerHTML = `
@@ -745,7 +1001,7 @@
 
             logList.insertBefore(entry, logList.firstChild);
 
-            // Keep only last 100 entries
+            // Keep only last 100 entries to prevent lag
             while (logList.children.length > 100) {
                 logList.removeChild(logList.lastChild);
             }
@@ -770,8 +1026,17 @@
             logList.scrollTop = logList.scrollHeight;
         }
 
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('experimentModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
         window.onload = function() {
             loadInitialData();
+            // Poll for updates every 2 seconds
             setInterval(fetchAll, 2000);
         }
     </script>

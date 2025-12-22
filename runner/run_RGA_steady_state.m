@@ -1,0 +1,126 @@
+%% Run a steady-state Genetic Algorithm on a given single-objective optimization problem
+% Input
+% - op: a struct describing the optimization problem with the following attributes:
+%   - .fun: handler of the objective function
+%   - .dim: problem dimensionality
+%   - bounds: a matrix 1x2 having as first element lower bound and second element upper bound (assuming it is the same for each dimension)
+%   - .opt: a matrix mxd points in d dimension representing the m true optima in the search space
+%   - .opt_known: a boolean flag set to true if the optimum/optima is/are known 
+%   - .isMin: a boolean flag set to true if the problem is minimization, false if maximization
+%   - .maxFE: maximum number of function evaluation budget
+% - algo: a struct containing the parameters and settings of the algorithm with the following attributes:
+%   - .pop_size: population size
+%   - .crossover: a struct containing the parameters of the sbx crossover with the following attributes:
+%     - .p_c: probability of crossover
+%     - .eta_c: eta parameter of sbx (higher values will generate offspring closer to their parents)
+%   - .mutation: a struct containing the parameters of the polynomial mutation with the following attributes:
+%     - .p_m: probability of mutation
+%     - .eta_m: eta parameter of polynomial mutation (higher values will generate mutated individuals closer to their original)
+%   - .verbose: a boolean flag set to true if you desired the output log to be printed on screen in real time
+%   - .plotting: a boolean flag set to true if you desired to visualize the plot with solutions evolving in real time
+%   - .refresh: duration of the pause between plots
+% Output
+% - best: a struct containing the all time best solution (respectively) with the following attributes:
+%   - .point: an array 1xd representing the point of the best solution in d dimensions
+%   - .fit: fitness of the individual
+% - error: a struct containing the error with respect of the true optimum, with the following attributes:
+%   - .src_space: error in the search space, i.e. Euclidean distance to true optimum (or -1 if unknown)
+%   - .obj_space: error in the objective space, absolute value of difference with objective value of true optimum (or -1 if unknown)
+% - runtime: runtime in seconds
+% - convergence_array: an array ix1 containing all the best fitness for each iteration to check convergence
+function [best, error, runtime, convergence_array] = run_RGA_steady_state(op, algo)
+    
+    close all;
+    rng shuffle;
+    
+    %--INITIALIZATION 
+    
+    % in case a funny user decides to have an odd number of idividuals in the population...
+    if mod(algo.pop_size,2) ~= 0
+        algo.pop_size = algo.pop_size + 1;
+    end
+    if algo.pop_size <= 0
+        algo.pop_size = 100;
+    end
+
+    convergence_array = [];
+
+    tic;    % start timer
+    pop = Shared.initializeRandomPopulation(algo.pop_size, op.dim, op.bounds);     % init population 
+    [pop, op.maxFE] = Shared.evaluate(pop, op.fun, op.maxFE);                      % evaluate
+    [best, ~] = Shared.findBestWorst(pop, op.isMin);                               % update best
+    
+    %--PLOT (DRAW SEARCH SPACE)
+    if algo.plotting == true
+        Shared.plotPopulation(pop,best,op,true);
+        pause(algo.refresh);
+    end
+   
+    %--ITERATIONS
+    iteration = 1;
+    while op.maxFE > 0
+        %--EVOLUTIONARY OPERATIONS
+        matPool = Shared.kWayTournamentSelection(pop, 2, algo.pop_size, 2, op.isMin);    % selection 
+        off = variation(matPool, algo.crossover, algo.mutation, op.bounds);             % variation
+        [off, op.maxFE] = Shared.evaluate(off, op.fun, op.maxFE);                        % evaluate
+        pop = Shared.survival_bestToWorst(pop, off, op.isMin);                           % survival
+
+        %--UPDATE BEST SOLUTION
+        [pop_best, ~] = Shared.findBestWorst(pop, op.isMin);
+        best = Shared.updateBest(best, pop_best, op.isMin);
+
+        convergence_array = [convergence_array; best.fit];
+
+        %--VERBOSE (SHOW LOG)
+        if algo.verbose
+            if mod(iteration,algo.pop_size) == 0 % do not print log at each iteration... that's too much
+                fprintf('IT: %d FEs: %d)\t', iteration, op.maxFE);
+                fprintf('Fit: %.10f ', best.fit);
+                fprintf('\n');
+            end
+        end
+        
+        %--PLOT (DRAW SEARCH SPACE)
+        if algo.plotting == true
+            Shared.plotPopulation(pop,best,op,false);
+            pause(algo.refresh);
+        end
+
+        iteration = iteration + 1;
+    end  
+    runtime = toc; % stop timer
+
+    error = Shared.calculateError(op,best);     % calculate error
+    best = rmfield(best,'idx');                 % remove field .idx from 'best' because it is not used outside this function
+end
+
+%% Perform variation operations (i.e., crossover and mutation)
+% Input
+% - matPool: a matrix nx(d+1) of n points in d dimensions representing the mating pool, i.e. the parents to undergoe reproduction
+% - .cross_params: a struct containing the parameters of the sbx crossover with the following attributes:
+%   - .p_c: probability of crossover
+%   - .eta_c: eta parameter of sbx (higher values will generate offspring closer to their parents)
+% - .mut_params: a struct containing the parameters of the polynomial mutation with the following attributes:
+%   - .p_m: probability of mutation
+%   - .eta_m: eta parameter of polynomial mutation (higher values will generate mutated individuals closer to their original)
+% - .bounds: a matrix 1x2 having as first element lower bound and second element upper bound (assuming it is the same for each dimension)
+% Output
+% - off: a matrix 2x(d+1) of 2 points in d dimensions representing the two offspring, last column is fitness value
+function [off] = variation(matPool, cross_params, mut_params, bounds)
+    
+    d = size(matPool,2);
+
+    % declare a static array of chromosomes filled with zeros
+    off = zeros(2,d);
+    
+    % crossover
+    p1 = matPool(1,1:end-1);
+    p2 = matPool(2,1:end-1);
+
+    [o1, o2] = Shared.sbxCrossover(p1, p2, cross_params, bounds);
+
+    % mutation
+    off(1,1:end-1) = Shared.polynomialMutation(o1, mut_params, bounds);
+    off(2,1:end-1) = Shared.polynomialMutation(o2, mut_params, bounds);
+        
+end
