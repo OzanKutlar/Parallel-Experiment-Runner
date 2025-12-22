@@ -1,5 +1,5 @@
 function data = GetFromServer(ip, port, maxDelay)
-    url = sprintf('http://%s:%d', ip, port);
+    url = sprintf('http://%s:%s', ip, port);
 
     computerName = getenv('COMPUTERNAME');
     
@@ -13,7 +13,6 @@ function data = GetFromServer(ip, port, maxDelay)
     pause(delay);
     
     while true
-        try
             data = webread(url, options);
             
             if isfield(data, 'message')
@@ -33,12 +32,6 @@ function data = GetFromServer(ip, port, maxDelay)
             delay = round(minDelay + (maxDelay - minDelay) * rand());
             fprintf("Job %d Complete. Cooling down for %d seconds.\n", data.id, delay);
             pause(delay);
-
-        catch ME
-            fprintf('Error occurred: %s\n', ME.message);
-            fprintf('Retrying in 10 seconds...\n');
-            pause(10);
-        end
     end
 end
 
@@ -55,6 +48,7 @@ function fileName = runExperiment(data)
     algo.refresh = 0.05;
     algo.survival = struct;     
     algo.survival.schema = data.survival;
+    algo.fasten = 1;
 
     if strcmp(data.algo, 'BBBC')
         algo.pop_size = data.pop_size;
