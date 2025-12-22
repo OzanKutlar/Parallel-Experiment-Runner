@@ -1,90 +1,124 @@
 function data = GetFromServer(ip, port, maxDelay)
-    url = sprintf('http://%s:%s', ip, port);
-
+    url = sprintf('http://%s:%d', ip, port);
 
     computerName = getenv('COMPUTERNAME');
-    % numbers = regexp(computerName, '\d+', 'match');
-	options = weboptions('HeaderFields', {'ComputerName', computerName}); % Add the computerName as a header
+    
+    % Initial Options
+    options = weboptions('HeaderFields', {'ComputerName', computerName}); 
 
     minDelay = 1;
 
-    
-    
     delay = round(minDelay + (maxDelay - minDelay) * rand());
-    fprintf('Delaying for %d seconds\n', delay);
+    fprintf('Initial delay for %d seconds...\n', delay);
     pause(delay);
     
-	
-	for i = 1:100
-		data = webread(url, options);
-		if isfield(data, 'message')
-			fprintf('Stopping with message : %s\nI ran %d experiments.\n', data.message, i);
-            !start selfDestruct.bat
+    while true
+        try
+            data = webread(url, options);
             
-			return
-		end
-		display(data);
-		delay = round(minDelay + (maxDelay - minDelay) * rand());
-        fprintf("Finished Experiment. Delaying for %d seconds before asking for another.\n", delay);
-		nameOfFile = strcat("exp-testing", string(data.id));
-        nameOfFile = "exp-testing1";
-		nameOfFile = strcat('experiments/', nameOfFile, '.mat');
-        nameOfFile = runExperiment(data);
-		uploadFileToServerAsJSON(nameOfFile, url, computerName, data.id)
-		options = weboptions(...
-			'HeaderFields', {...
-				'ComputerName', computerName; ...
-				'ID', num2str(data.id) ...
-			}...
-		);
-		pause(delay);
+            if isfield(data, 'message')
+                fprintf('Server Message: %s\nStopping client.\n', data.message);
+                % if exist('selfDestruct.bat', 'file')
+                    % !start selfDestruct.bat
+                % end
+                return;
+            end
+
+            fprintf('Received Job ID: %d (%s - %s)\n', data.id, data.algo, data.fun);
+
+            nameOfFile = runExperiment(data);
+
+            uploadFileToServerAsJSON(nameOfFile, url, computerName, data.id);
+
+            delay = round(minDelay + (maxDelay - minDelay) * rand());
+            fprintf("Job %d Complete. Cooling down for %d seconds.\n", data.id, delay);
+            pause(delay);
+
+        catch ME
+            fprintf('Error occurred: %s\n', ME.message);
+            fprintf('Retrying in 10 seconds...\n');
+            pause(10);
+        end
     end
-    
-    fprintf('The for loop ended. This shouldnt happen?\nI ran %d experiments.\n', i);
-    % !taskkill /F /im "matlab.exe"
-    return
-    
 end
 
 function fileName = runExperiment(data)
-    disp("Test");
-    pause(1);
-    fileName = "check.sh";
+    op = struct;
+    op.dim = data.dim;  
+    op.maxFE = 0;
+    
+    op = selectOptimizationProblem(data.fun, op);
+    
+    algo = struct;
+    algo.verbose = false; 
+    algo.plotting = false;
+    algo.refresh = 0.05;
+    algo.survival = struct;     
+    algo.survival.schema = data.survival;
+
+    if strcmp(data.algo, 'BBBC')
+        algo.pop_size = data.pop_size;
+        
+        [best, error, runtime, convergence_array] = run_BBBC(op, algo);
+        
+    elseif strcmp(data.algo, 'ES')
+        algo.off_size = data.off_size;
+        
+        if data.mu_type == 1
+            algo.pop_size = 1;
+        else
+            algo.pop_size = 1; 
+        end
+        
+        R = op.bounds(2) - op.bounds(1);
+        
+        if data.sigma_type == 1
+            algo.sigma = R / (20 * sqrt(op.dim));
+        elseif data.sigma_type == 2
+            algo.sigma = R / (2 * sqrt(op.dim));
+        elseif data.sigma_type == 3
+            algo.sigma = R / sqrt(op.dim);
+        end
+        
+        algo.tau = 1/sqrt(2*op.dim);
+        algo.tau_prime = 1/sqrt(2*sqrt(op.dim));
+        
+        [best, error, runtime, convergence_array] = run_ES(op, algo);
+    end
+
+    fileName = sprintf('exp-%d.mat', data.id);
+    
+    save(fileName, 'best', 'error', 'runtime', 'convergence_array', 'op', 'algo');
 end
 
 function uploadFileToServerAsJSON(fileName, serverUrl, computerName, dataId)
-    % Check if the file exists
     filePath = fullfile(pwd, fileName);
     if ~isfile(filePath)
         error('File "%s" does not exist at the specified path.', fileName);
     end
 
-    % Read the binary content of the file
     try
-        fid = fopen(filePath, 'rb'); % Open the file in binary mode
-        fileData = fread(fid, '*uint8'); % Read as uint8 binary data
-        fclose(fid); % Close the file
+        fid = fopen(filePath, 'rb'); 
+        fileData = fread(fid, '*uint8'); 
+        fclose(fid); 
     catch ME
         if exist('fid', 'var') && fid > 0
-            fclose(fid); % Ensure file is closed on error
+            fclose(fid); 
         end
         error('Error reading the file: %s', ME.message);
     end
 
-    % Encode binary data in Base64
     base64FileData = matlab.net.base64encode(fileData);
 
-    % Prepare JSON data
     jsonData = struct();
-    jsonData.file_name = sprintf('exp-%d.mat', dataId);
+    jsonData.file_name = fileName;
     jsonData.file = base64FileData;
 
-    % Convert the structure to a JSON string
     jsonString = jsonencode(jsonData);
 
-    % Set up the headers
     options = weboptions(...
         'MediaType', 'application/json', ...
+        'Timeout', 60, ...
         'HeaderFields', {...
             'Content-Type', 'application/json'; ...
             'ComputerName', computerName; ...
@@ -95,9 +129,7 @@ function uploadFileToServerAsJSON(fileName, serverUrl, computerName, dataId)
     % Send the POST request
     try
         response = webwrite(serverUrl, jsonString, options);
-        % Display the server response
-        disp('Server Response:');
-        disp(response);
+        % disp('Upload Successful.');
     catch ME
         error('Error during POST request: %s', ME.message);
     end
