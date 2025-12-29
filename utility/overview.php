@@ -711,6 +711,12 @@
                     }
                 })
                 .catch(e => console.error(e));
+
+            // Fetch server-side calculated stats
+            fetch(`http://${serverIp}:3753/timeStats`)
+                .then(r => r.json())
+                .then(stats => updateTimeStats(stats))
+                .catch(e => console.error(e));
         }
 
         function handleSearch() {
@@ -740,8 +746,6 @@
             document.getElementById('completedCount').textContent = finished.length;
             document.getElementById('waitingCount').textContent = totalExperiments - finished.length - running.length;
 
-            // ETA Calculation
-            calculateETA(finished.length, totalExperiments);
 
             // Active Workers Panel
             updateActiveWorkers(running);
@@ -765,46 +769,25 @@
             updateActivityList('finishedList', finished.reverse().filter(filterFn), 'finished', 'finishedCount', forceRender);
         }
 
-        // --- ETA LOGIC ---
-        function calculateETA(currentFinished, total) {
-            const now = Date.now();
-            
-            // Detect new completions
-            if (currentFinished > previousFinishedCount) {
-                const diff = currentFinished - previousFinishedCount;
-                // Add timestamp for every newly finished item
-                for(let i=0; i<diff; i++) completionTimestamps.push(now);
-            }
-            previousFinishedCount = currentFinished;
-
-            // Keep only last 5 minutes of data for Moving Average
-            const cutoff = now - 300000; 
-            completionTimestamps = completionTimestamps.filter(t => t > cutoff);
-
-            const remaining = total - currentFinished;
+        // --- TIME STATS UI LOGIC ---
+        function updateTimeStats(stats) {
             const etaEl = document.getElementById('etaValue');
+            const etaSeconds = stats.eta_seconds;
 
-            if (remaining <= 0) {
+            if (etaSeconds === 0 && document.getElementById('progressPercent').textContent === '100%') {
                 etaEl.innerText = "Done";
                 return;
             }
 
-            if (completionTimestamps.length < 2) {
-                // Not enough data points yet
+            if (stats.active_workers === 0) {
+                etaEl.innerText = "Paused (No Workers)";
+                return;
+            }
+
+            if (etaSeconds <= 0) {
                 etaEl.innerText = "Calculating...";
                 return;
             }
-
-            // Calculate rate: (Items) / (Time Window in Seconds)
-            const durationSec = (now - completionTimestamps[0]) / 1000;
-            const rate = completionTimestamps.length / durationSec;
-
-            if (rate <= 0) {
-                etaEl.innerText = "Stalled";
-                return;
-            }
-
-            const etaSeconds = remaining / rate;
             
             // Format ETA
             if (etaSeconds < 60) etaEl.innerText = `~${Math.round(etaSeconds)}s remaining`;

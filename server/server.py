@@ -8,6 +8,7 @@ import base64
 import numpy as np
 import socket
 import argparse
+from datetime import datetime
 
 # Server settings
 DEFAULT_HOST = "0.0.0.0"
@@ -137,6 +138,48 @@ class Experimenter:
             self.givenToPC[index] = 'Reset'
             self.completed_array[index] = False
             self.save_state() # Save after modification
+            
+    def calculate_time_stats(self):
+        durations = []
+        fmt = '%Y-%m-%d %H:%M:%S'
+        
+        with self.lock:
+            # Calculate average duration of completed tasks
+            for i, completed in enumerate(self.completed_array):
+                if completed and i < len(self.data_array):
+                    item = self.data_array[i]
+                    if 'Taken At' in item and 'Completed At' in item:
+                        try:
+                            start = datetime.strptime(item['Taken At'], fmt)
+                            end = datetime.strptime(item['Completed At'], fmt)
+                            durations.append((end - start).total_seconds())
+                        except Exception:
+                            continue
+
+            avg_seconds = np.mean(durations) if durations else 0
+            
+            # Count remaining
+            total = len(self.data_array)
+            finished = self.completed_array.count(True)
+            remaining = total - finished
+            
+            # Count active workers (approximate based on givenToPC that are not Null/Reset/PRE)
+            # Note: This is a rough estimate of concurrency
+            active_workers = 0
+            for pc in self.givenToPC:
+                if pc not in ["Null", "Reset", "PRE"]:
+                    active_workers += 1
+            
+            divisor = active_workers if active_workers > 0 else 1
+            
+            # ETA = (Remaining * Avg) / Concurrent Workers
+            eta_seconds = (remaining * avg_seconds) / divisor if avg_seconds > 0 else 0
+
+            return {
+                "average_duration": avg_seconds,
+                "eta_seconds": eta_seconds,
+                "active_workers": active_workers
+            }
 
 
 experimenter = Experimenter()
@@ -180,6 +223,15 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(str(len(experimenter.data_array)).encode())
             return
+        
+        if self.path == "/timeStats":
+            stats = experimenter.calculate_time_stats()
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(stats).encode())
+            return
+        
         
         if self.path == "/logs":
             last_log = int(self.headers.get('lastLog', len(experimenter.logs) - 6))
