@@ -1,174 +1,260 @@
-# Parallel Experiment Runner
+# Generic Distributed Experiment Runner
 
-This project is designed to easily distribute and run large numbers of experiments across multiple computers in parallel using a simple API server. Each machine retrieves parameters, runs an experiment, and sends back results.
+This system is a language-agnostic framework designed to distribute large-scale computational experiments across multiple computers. It uses a central Python-based HTTP server to manage a job queue, while clients (runners) written in **any language** fetch parameters, execute tasks, and upload results.
 
 ---
 
-## 🔧 Step 1: Define Your Experiment Parameters
+## 📂 Project Structure
 
-Start by creating your experiment parameters file. You can tweak the existing example and save it as something like `parameters_experiment.py`.
+```text
+├── server/                 # Central Orchestrator
+│   ├── server.py           # Main HTTP server logic
+│   ├── data/               # Stores result files uploaded by clients
+│   └── parameters_exp.py   # Define your experiment search space here
+├── utility/                # Dashboards
+│   ├── overview.php        # Modern Dark/Light mode Dashboard
+│   └── index.php           # Legacy Dashboard
+├── clients/                # Example Runners (You write these)
+    ├── runner.py           # Python example
+    ├── runner.m            # MATLAB example
+    ├── runner.sh           # Bash example
+    └── runner.cpp          # C++ example
+└── ParameterExamples.md    # 📖 Guide to defining experiment parameters
+```
 
-### Example `parameters_experiment.py`
+---
+
+## 🔧 Step 1: Configure & Start the Server
+
+### 1. Define Parameters
+Create a Python file in the `server/` directory (e.g., `parameters_exp.py`). The server will generate every permutation of lists provided.
 
 ```python
-example_shared_params = {
-    "combIdx": list(range(1, 5)),   # Will result in 4 different experiments
-    "sp": ["env1", "env2", "env3", "env4"],  # Each experiment will get a different environment
-    "algo": [15]  # This parameter remains constant across all experiments
+# parameters_exp.py
+shared_params = {
+    "dataset": ["Data_A", "Data_B"],
+    "learning_rate": [0.01, 0.001],
+    "optimizer": ["adam", "sgd"]
 }
+# This generates 8 distinct jobs.
+# IMPORTANT: Must result in a variable named 'data_array'
+data_array, _ = generate_combined_data({}, 1, shared_params)
 ```
 
-> Note: Each experiment is also automatically assigned a unique `id` parameter by the server.
+> 📘 **See [ParameterExamples.md](ParameterExamples.md) for advanced configurations (Branching, Fixed Pairs, Math generation).**
+
+### 2. Start the Server
+```bash
+cd server
+python server.py --file parameters_exp.py --port 3753
+```
 
 ---
 
-## 🌐 Step 2: Modify Your Project to Use the API
+## 💻 Step 2: Implement the Client (Runner)
 
-Each experiment must communicate with the central API server:
+The server exposes a simple REST API. Your client needs to perform a loop of **GET** (fetch job) and **POST** (upload result).
 
-- **GET requests** fetch a new experiment to run.
-- **POST requests** send back results.
+### API Protocol
+1.  **GET** `http://SERVER_IP:PORT/`
+    *   **Response:** JSON object containing parameters and a unique `id`.
+    *   *If response contains `{"message": "No more data left."}`, stop.*
+2.  **Run Experiment** using the received parameters.
+3.  **POST** `http://SERVER_IP:PORT/`
+    *   **Headers:** `ID: <job_id>`, `ComputerName: <hostname>`
+    *   **Body (JSON):**
+        ```json
+        {
+          "file_name": "result_<id>.json",
+          "file": "<base64_encoded_content_of_result>"
+        }
+        ```
 
-### 📥 GET Request (First Time)
+### Example Runner Code
 
-All experiment requests should hit the root endpoint, e.g., `http://localhost:3753`.
+#### 🐍 Python
+```python
+import requests, json, base64, socket, time
 
-> **Include a random startup delay to avoid flooding the server!**  
-> Use a delay of about **1/5 the number of total computers**.
+SERVER_URL = "http://127.0.0.1:3753"
+HOSTNAME = socket.gethostname()
 
-### ✅ Example MATLAB GET Code (First Request Only)
+while True:
+    # 1. Get Job
+    try:
+        r = requests.get(SERVER_URL, headers={"ComputerName": HOSTNAME})
+        job = r.json()
+    except:
+        print("Server unreachable, retrying..."); time.sleep(5); continue
 
+    if "message" in job:
+        print("Done."); break
+
+    print(f"Running Job ID {job['id']} with {job}")
+    
+    # 2. Do Work (Simulation/Calc)
+    result_content = f"Result for {job['id']}: Success".encode('utf-8')
+    
+    # 3. Upload Result
+    payload = {
+        "file_name": f"res_{job['id']}.txt",
+        "file": base64.b64encode(result_content).decode('utf-8')
+    }
+    requests.post(SERVER_URL, json=payload, headers={"ID": str(job['id']), "ComputerName": HOSTNAME})
+```
+
+#### 🐚 Bash (curl + jq)
+```bash
+SERVER="http://127.0.0.1:3753"
+HOST=$(hostname)
+
+while true; do
+    # 1. Get Job
+    RESPONSE=$(curl -s -H "ComputerName: $HOST" "$SERVER")
+    MSG=$(echo "$RESPONSE" | jq -r '.message // empty')
+    
+    if [ "$MSG" == "No more data left." ]; then break; fi
+    
+    ID=$(echo "$RESPONSE" | jq -r '.id')
+    echo "Running Job $ID..."
+    
+    # 2. Run Experiment & Encode Result
+    echo "Result data" > result.txt
+    B64=$(base64 -w 0 result.txt)
+    
+    # 3. Upload
+    JSON="{\"file_name\": \"res_$ID.txt\", \"file\": \"$B64\"}"
+    curl -s -X POST -H "Content-Type: application/json" -H "ID: $ID" -d "$JSON" "$SERVER"
+done
+```
+
+#### 🔢 MATLAB
 ```matlab
-url = sprintf('http://localhost:3753');
-computerName = getenv('COMPUTERNAME');
-options = weboptions('HeaderFields', {'ComputerName', computerName});
-data = webread(url, options);
-```
+server = 'http://127.0.0.1:3753';
+options = weboptions('HeaderFields', {'ComputerName', getenv('COMPUTERNAME')}, 'Timeout', 30);
 
-Example server response:
-```json
-{
-  "combIdx": 1,
-  "sp": "env1",
-  "algo": "rrt",
-  "id": 1
-}
-```
-
-MATLAB automatically parses the response, so you can access `data.sp`, `data.id`, etc.
-
----
-
-### 🔄 GET Request (Subsequent Calls)
-
-**Important:** After your experiment finishes, you must **include the `ID` header** in the next GET request. This tells the server what experiment you just finished and prevents data loss.
-
-```matlab
-options = weboptions('HeaderFields', {
-    'ComputerName', computerName;
-    'ID', num2str(data.id)
-});
-data = webread(url, options);
-```
-
----
-
-## 📤 POST Request – Sending Results
-
-Once an experiment is done, send back the result file with a POST request.
-
-**POST Requirements:**
-
-- Headers:
-  - `ComputerName`
-  - `ID` (the experiment ID)
-- JSON Body:
-  ```json
-  {
-    "file_name": "exp_1.mat",
-    "file": "<base64_encoded_file_contents>"
-  }
-  ```
-
-> If you do **not** implement this step, see shutdown guidance below.
-
----
-
-## 🛑 No More Experiments
-
-When there are no more experiments left, the server will respond with:
-
-```json
-{ "message": "No more data left." }
-```
-
-### Example MATLAB Handling
-
-```matlab
-if isfield(data, 'message')
-    fprintf('Stopping with message: %s\nI ran %d experiments.\n', data.message, i);
-    !start selfDestruct.bat
-    return
+while true
+    % 1. Get Job
+    job = webread(server, options);
+    if isfield(job, 'message'), break; end
+    
+    fprintf('Job %d\n', job.id);
+    
+    % 2. Do Work
+    resultData = rand(5); 
+    save('temp.mat', 'resultData');
+    
+    % 3. Encode & Upload
+    fid = fopen('temp.mat', 'rb'); 
+    raw = fread(fid, '*uint8'); 
+    fclose(fid);
+    
+    b64 = matlab.net.base64encode(raw);
+    structData = struct('file_name', sprintf('res_%d.mat', job.id), 'file', b64);
+    
+    postOpts = weboptions('MediaType', 'application/json', 'HeaderFields', {'ID', num2str(job.id)});
+    webwrite(server, jsonencode(structData), postOpts);
 end
 ```
 
-> If you're not using POST, replace the line with:
-```matlab
-!shutdown /s /t 360
-!taskkill /F /im "matlab.exe"
+#### 🇨 C++ (using cpr/libcurl)
+```cpp
+#include <cpr/cpr.h>
+#include <nlohmann/json.hpp>
+#include <iostream>
+#include "base64.h" // Assumes a base64 helper exists
+
+using json = nlohmann::json;
+
+int main() {
+    std::string url = "http://127.0.0.1:3753";
+    
+    while(true) {
+        // 1. Get Job
+        auto r = cpr::Get(cpr::Url{url}, cpr::Header{{"ComputerName", "CppNode"}});
+        auto job = json::parse(r.text);
+        
+        if (job.contains("message")) break;
+        
+        int id = job["id"];
+        std::cout << "Processing ID: " << id << std::endl;
+        
+        // 2. Do Work & Encode
+        std::string result = "Calculation Data";
+        std::string b64_result = base64_encode(result);
+        
+        // 3. Upload
+        json payload = {
+            {"file_name", "res_" + std::to_string(id) + ".txt"},
+            {"file", b64_result}
+        };
+        
+        cpr::Post(cpr::Url{url}, 
+                  cpr::Body{payload.dump()},
+                  cpr::Header{{"Content-Type", "application/json"}, {"ID", std::to_string(id)}});
+    }
+    return 0;
+}
+```
+
+#### 🇨 C (using standard libcurl)
+*Note: Requires generic linked list or string parsing for JSON without a heavy library.*
+```c
+#include <stdio.h>
+#include <curl/curl.h>
+
+int main(void) {
+    CURL *curl;
+    CURLcode res;
+    
+    curl = curl_easy_init();
+    if(curl) {
+        // Simple logic: Perform GET, parse ID manually, Perform POST
+        // 1. GET
+        curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:3753");
+        // ... (Callback to store response string omitted for brevity)
+        // res = curl_easy_perform(curl);
+        
+        // 2. POST (Assume we have ID and Base64 string)
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+        headers = curl_slist_append(headers, "ID: 1"); // Example ID
+        
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "{\"file_name\": \"res.txt\", \"file\": \"...\"}");
+        
+        res = curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+    }
+    return 0;
+}
 ```
 
 ---
 
-## 💣 Step 3: Self-Destruct (Recommended)
+## 📊 Step 3: Launching the Dashboard
 
-To clean up automatically, write a script similar to `selfDestruct.bat` that deletes the experiment folder after it's done.
+You can monitor the progress of experiments using the PHP files in the `utility/` folder.
 
----
-
-## 📦 Step 4: Distribute the Project
-
-Once everything is ready:
-- Zip the entire folder.
-- Send it to all target machines (e.g., using [Veyon](https://veyon.io)).
-
----
-
-## 📂 Step 5: Unzip on Each Machine
-
-Use PowerShell to unzip the archive on each remote machine:
-
-```powershell
-powershell -Command Expand-Archive "%Absolute Path to zip%"
+### General Launch
+If you have PHP installed, navigate to the `utility` folder and run:
+```bash
+cd utility
+php -S 0.0.0.0:8080
 ```
+Then access `http://localhost:8080/overview.php` in your browser.
 
----
-
-## ▶️ Step 6: Start the Experiment
-
-Launch the experiment runner from MATLAB like this:
+### 🧬 Specific Launch for Evolab (WSL)
+For the Evolab environment running via WSL, use the following command to launch the dashboard on port 34000 under the user 'ozan':
 
 ```bash
-matlab -sd "%Path_to_running_folder%" -r "GetFromServer('171.22.173.112', 30)"
+wsl -u ozan php -S 0.0.0.0:34000 utility/overview.php
 ```
-
-- `Path_to_running_folder`: The path where the zip was extracted.
-- `171.22.173.112`: Replace with the server's IP.
-- `30`: Random delay.
+*(Note: Using `overview.php` as the router script allows you to access it directly at `http://localhost:34000`)*.
 
 ---
 
-## ✅ Summary
-
-- Define experiment parameters
-- Connect your experiment to the API (GET + POST)
-- Add a delay to avoid server overload
-- Include `ID` header in subsequent GETs
-- Handle end-of-experiment response
-- Distribute, unzip, and run
-
----
-
-For any bugs or contributions, feel free to open an issue or pull request.
-
-Happy experimenting! 🚀
+## ⚠️ Requirements
+*   **Server**: Python 3.x, `numpy`
+*   **Dashboard**: PHP 7.0+
+*   **Clients**: Any language supporting HTTP requests.
