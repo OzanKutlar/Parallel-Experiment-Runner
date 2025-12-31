@@ -466,6 +466,7 @@ def check_missing_files(directory, max_number):
     for i in range(0, experimenter.data_index[-1]):
         experimenter.completed_array[i] = True
         experimenter.givenToPC[i] = "PRE"
+        experimenter.stateLog("Finished", i + 1, "PRE")
 
     # Double check gaps
     for i in range(1, lastNonMissing):
