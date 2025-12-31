@@ -60,8 +60,18 @@ function fileName = runExperiment(data)
         
         if data.mu_type == 1
             algo.pop_size = 1;
+        elseif data.mu_type == 2
+            algo.pop_size = round(algo.off_size / 5);
+        elseif data.mu_type == 3
+            algo.pop_size = round(algo.off_size / 3);
+        elseif data.mu_type == 4
+            algo.pop_size = round(algo.off_size / 2);
         else
             algo.pop_size = 1; 
+        end
+        
+        if algo.pop_size < 1
+            algo.pop_size = 1;
         end
         
         R = op.bounds(2) - op.bounds(1);

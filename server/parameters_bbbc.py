@@ -24,6 +24,14 @@ es_params = {
     "sigma_type": [1, 2, 3]
 }
 
+es_params_other = {
+    "algo": ["ES"],
+    "off_size": populations, 
+    "survival": ["(µ+λ)", "(µ,λ)"],
+    "mu_type": [2, 3, 4], 
+    "sigma_type": [1, 2, 3]
+}
+
 
 data_bbbc, id_counter = generate_combined_data(
     shared_params,
@@ -37,4 +45,10 @@ data_es, id_counter = generate_combined_data(
     es_params
 )
 
-data_array = data_bbbc + data_es
+data_es_other, id_counter = generate_combined_data(
+    shared_params,
+    id_counter,
+    es_params_other
+)
+
+data_array = data_bbbc + data_es + data_es_other
