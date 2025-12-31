@@ -28,10 +28,24 @@ class Experimenter:
     def save_state(self):
         """Persist current state to disk."""
         try:
+            # Extract timing info from data_array to persist it
+            timing_info = {}
+            for i, item in enumerate(self.data_array):
+                info = {}
+                if 'Taken At' in item:
+                    info['Taken At'] = item['Taken At']
+                if 'Completed At' in item:
+                    info['Completed At'] = item['Completed At']
+                if info:
+                    timing_info[str(i)] = info
+
             state = {
                 "completed_array": self.completed_array,
                 "givenToPC": self.givenToPC,
-                "data_index": self.data_index
+                "data_index": self.data_index,
+                "logs": self.logs,
+                "stateLogs": self.stateLogs,
+                "timing_info": timing_info
             }
             with open(STATE_FILE, 'w') as f:
                 json.dump(state, f)
@@ -55,6 +69,19 @@ class Experimenter:
             self.completed_array = state.get("completed_array", [])
             self.givenToPC = state.get("givenToPC", [])
             self.data_index = state.get("data_index", [0])
+            self.logs = state.get("logs", [])
+            self.stateLogs = state.get("stateLogs", [])
+
+            # Restore timing info to data_array
+            timing_info = state.get("timing_info", {})
+            for idx_str, info in timing_info.items():
+                try:
+                    idx = int(idx_str)
+                    if 0 <= idx < len(self.data_array):
+                        self.data_array[idx].update(info)
+                except ValueError:
+                    pass
+
             print(f"State loaded from {STATE_FILE}")
             return True
         except Exception as e:
