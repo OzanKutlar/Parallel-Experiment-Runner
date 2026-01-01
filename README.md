@@ -14,9 +14,10 @@ This system is a language-agnostic framework designed to distribute large-scale 
 ├── utility/                # Dashboards
 │   ├── overview.php        # Modern Dark/Light mode Dashboard
 │   └── index.php           # Legacy Dashboard
-├── clients/                # Ready-to-use Runners
+├── runner/                 # Ready-to-use Runners
 │   ├── python_runner.py    # Standard Python runner
 │   ├── generic_runner.py   # Wrapper for EXEs (C++, Rust, etc.)
+│   ├── GetFromServer.m     # Matlab Runner example
 │   └── bash_runner.sh      # Bash/Curl example
 ├── RunnerTutorial.md       # 📖 Step-by-step guide to creating runners
 └── ParameterExamples.md    # 📖 Guide to defining experiment parameters
@@ -57,9 +58,10 @@ python server.py --file parameters_exp.py --port 3753
 
 The server exposes a simple REST API. We provide ready-to-use clients in the `clients/` folder:
 
-*   **[python_runner.py](clients/python_runner.py)**: The standard runner for Python-based experiments.
-*   **[generic_runner.py](clients/generic_runner.py)**: A wrapper script that runs **Any Executable** (C++, Go, Rust, etc.) by passing parameters as command-line arguments.
-*   **[bash_runner.sh](clients/bash_runner.sh)**: A simple curl-based runner for Linux environments.
+*   **[runner_py.py](runner/runner_py.py)**: The standard runner for Python-based experiments.
+*   **[generic_runner.py](runner/generic_runner.py)**: A wrapper script that runs **Any Executable** (C++, Go, Rust, etc.) by passing parameters as command-line arguments.
+*   **[runner_bash.sh](runner/runner_bash.sh)**: A simple curl-based runner for Linux environments.
+*   **[GetFromServer.m](runner/GetFromServer.m)**: A Matlab runner for Matlab Experiments environments.
 
 Your client needs to perform a loop of **GET** (fetch job) and **POST** (upload result).
 
