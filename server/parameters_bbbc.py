@@ -35,4 +35,4 @@ data_es, id_counter = generate_combined_data(
 )
 
 
-data_array = data_bbbc + data_es + data_es_other
+data_array = data_bbbc + data_es
