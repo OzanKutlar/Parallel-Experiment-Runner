@@ -18,9 +18,7 @@ function data = GetFromServer(ip, port, maxDelay)
 
             if isfield(data, 'message')
                 fprintf('Server Message: %s\nStopping client.\n', data.message);
-                % if exist('selfDestruct.bat', 'file')
-                    % !start selfDestruct.bat
-                % end
+                !shutdown /s /t 360
                 return;
             end
 
@@ -36,70 +34,70 @@ function data = GetFromServer(ip, port, maxDelay)
             fprintf("Job %d Complete. Cooling down for %d seconds.\n", data.id, delay);
             pause(delay);
         catch ME
-                fprintf("Worker encountered an error: %s\n", ME.message);
-                fprintf("Taking a 10 second break.");
-                pause(10)
-                end
+            fprintf("Worker encountered an error: %s\n", ME.message);
+            fprintf("Taking a 10 second break.\n");
+            pause(10)
+        end
     end
 end
 
 function fileName = runExperiment(data)
     op = struct;
     op.dim = data.dim;
-    op.maxFE = 0;
-
+    op.maxFE = 1e5 * op.dim;   % Updated from setup_experiments
+    op.bbob_iid = data.inst;   % Capturing the instance ID
+    
     op = selectOptimizationProblem(data.fun, op);
 
     algo = struct;
     algo.verbose = false;
     algo.plotting = false;
     algo.refresh = 0.05;
-    algo.survival = struct;
-    algo.survival.schema = data.survival;
-    algo.fasten = 1;
 
+    % ------------------------
+    % BBBC Algorithm Setup
+    % ------------------------
     if strcmp(data.algo, 'BBBC')
-        algo.pop_size = data.pop_size;
+        algo.pop_size = 10 * op.dim; % Population size based on dimensions
+        algo.survival = struct;
+        algo.survival.schema = data.bbbc_survival;
+		
+
 
         [best, error, runtime, convergence_array] = run_BBBC(op, algo);
 
-    elseif strcmp(data.algo, 'ES')
-        algo.off_size = data.off_size;
 
+    % ------------------------
+    % ES & ES-SA Setup
+    % ------------------------
+    elseif strcmp(data.algo, 'ES') || strcmp(data.algo, 'ES-SA')
+        algo.lambda = 10 * op.dim; % lambda size based on dimensions
+        
         if data.mu_type == 1
-            algo.pop_size = 1;
+            algo.mu = 1;
         elseif data.mu_type == 2
-            algo.pop_size = round(algo.off_size / 5);
-        elseif data.mu_type == 3
-            algo.pop_size = round(algo.off_size / 3);
-        elseif data.mu_type == 4
-            algo.pop_size = round(algo.off_size / 2);
+            algo.mu = floor(algo.lambda / 4);
         else
-            algo.pop_size = 1;
+            algo.mu = 1; % Fallback
         end
 
-        if algo.pop_size < 1
-            algo.pop_size = 1;
+        algo.sigma = (op.bounds(2)-op.bounds(1))/(2*sqrt(op.dim)); 
+        
+        algo.survival = struct;
+        algo.survival.schema = data.es_survival;
+
+        if strcmp(data.algo, 'ES')
+            [best, error, runtime, convergence_array] = run_ES_OneFifth(op, algo);
+        elseif strcmp(data.algo, 'ES-SA')
+            [best, error, runtime, convergence_array] = run_ES_SelfAdaptive(op, algo);
         end
-
-        R = op.bounds(2) - op.bounds(1);
-
-        if data.sigma_type == 1
-            algo.sigma = R / (20 * sqrt(op.dim));
-        elseif data.sigma_type == 2
-            algo.sigma = R / (2 * sqrt(op.dim));
-        elseif data.sigma_type == 3
-            algo.sigma = R / sqrt(op.dim);
-        end
-
-        algo.tau = 1/sqrt(2*op.dim);
-        algo.tau_prime = 1/sqrt(2*sqrt(op.dim));
-
-        [best, error, runtime, convergence_array] = run_ES(op, algo);
     end
 
+    % ------------------------
+    % Save Results
+    % ------------------------
     fileName = sprintf('exp-%d.mat', data.id);
-
+    
     save(fileName, 'best', 'error', 'runtime', 'convergence_array', 'op', 'algo');
 end
 
@@ -144,6 +142,6 @@ function uploadFileToServerAsJSON(fileName, serverUrl, computerName, dataId)
         response = webwrite(serverUrl, jsonString, options);
         % disp('Upload Successful.');
     catch ME
-        warning('Error during POST request: %s', ME.message);
+        error('Error during POST request: %s', ME.message);
     end
 end

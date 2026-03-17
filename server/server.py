@@ -1,4 +1,4 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 import json
 import os
 import time
@@ -24,6 +24,16 @@ class Experimenter:
         self.logs = []
         self.stateLogs = []
         self.lock = threading.Lock() # Thread lock for safety
+
+        self.auto_save_thread = threading.Thread(target=self._auto_save_loop, daemon=True)
+        self.auto_save_thread.start()
+
+    def _auto_save_loop(self):
+        """Runs in the background and saves state every 15 seconds."""
+        while True:
+            time.sleep(15)
+            with self.lock:
+                self.save_state()
 
     def save_state(self):
         """Persist current state to disk."""
@@ -131,7 +141,6 @@ class Experimenter:
                 log(f"Shutting down {computer_name}")
                 print(f'Data Distribution is finished. Extra connections : ', (last - len(self.data_array)))
             
-            self.save_state() # Save after modification
             return response_data
     
     def complete(self, ID, computer_name):
@@ -148,7 +157,6 @@ class Experimenter:
                 self.completed_array.extend([False] * (index + 1 - len(self.completed_array)))
             
             self.completed_array[index] = True
-            self.save_state() # Save after modification
 
     def reset(self, index):
         with self.lock:
@@ -164,47 +172,61 @@ class Experimenter:
 
             self.givenToPC[index] = 'Reset'
             self.completed_array[index] = False
-            self.save_state() # Save after modification
             
     def calculate_time_stats(self):
-        durations = []
         fmt = '%Y-%m-%d %H:%M:%S'
+        durations = []
         
         with self.lock:
-            # Calculate average duration of completed tasks
+            # 1. Calculate Active Workers
+            active_workers = 0
+            for i, pc in enumerate(self.givenToPC):
+                if i < len(self.completed_array):
+                    is_working = (pc != "Null" and pc != "Reset" and pc != "PRE")
+                    is_not_done = not self.completed_array[i]
+                    if is_working and is_not_done:
+                        active_workers += 1
+
+            # 2. Collect durations from ALL completed tasks
+            # We look for tasks that have both a 'Taken At' and 'Completed At' timestamp
             for i, completed in enumerate(self.completed_array):
-                if completed and i < len(self.data_array):
+                if completed:
                     item = self.data_array[i]
                     if 'Taken At' in item and 'Completed At' in item:
                         try:
-                            start = datetime.strptime(item['Taken At'], fmt)
-                            end = datetime.strptime(item['Completed At'], fmt)
-                            durations.append((end - start).total_seconds())
+                            start_time = datetime.strptime(item['Taken At'], fmt)
+                            end_time = datetime.strptime(item['Completed At'], fmt)
+                            duration = (end_time - start_time).total_seconds()
+                            
+                            # Sanity check: ensure duration is positive
+                            if duration > 0:
+                                durations.append(duration)
                         except Exception:
                             continue
 
-            avg_seconds = np.mean(durations) if durations else 0
+            # 3. Calculate Stats
+            total_tasks = len(self.data_array)
+            finished_tasks = self.completed_array.count(True)
+            remaining = total_tasks - finished_tasks
             
-            # Count remaining
-            total = len(self.data_array)
-            finished = self.completed_array.count(True)
-            remaining = total - finished
+            eta_seconds = 0
             
-            # Count active workers (approximate based on givenToPC that are not Null/Reset/PRE)
-            # Note: This is a rough estimate of concurrency
-            active_workers = 0
-            for pc in self.givenToPC:
-                if pc not in ["Null", "Reset", "PRE"]:
-                    active_workers += 1
-            
-            divisor = active_workers if active_workers > 0 else 1
-            
-            # ETA = (Remaining * Avg) / Concurrent Workers
-            eta_seconds = (remaining * avg_seconds) / divisor if avg_seconds > 0 else 0
+            # We need at least one finished task to calculate average, 
+            # and at least one active worker to process the remaining ones.
+            if len(durations) > 0 and active_workers > 0:
+                # Average wall-clock time it takes for a SINGLE worker to finish ONE task
+                avg_duration_per_task = sum(durations) / len(durations)
+                
+                # System throughput: How many seconds does the SYSTEM take to finish one task?
+                # If 1 task takes 100s, but we have 10 workers, the system finishes a task every 10s.
+                system_seconds_per_task = avg_duration_per_task / active_workers
+                
+                eta_seconds = remaining * system_seconds_per_task
 
             return {
-                "average_duration": avg_seconds,
                 "eta_seconds": eta_seconds,
+                "remaining": remaining,
+                "window_tasks": len(durations), # Using this to tell UI we have N samples
                 "active_workers": active_workers
             }
 
@@ -559,7 +581,7 @@ if __name__ == "__main__":
             experimenter.givenToPC.append("PRE")
             experimenter.completed_array.append(True)
 
-    server = HTTPServer((DEFAULT_HOST, args.port), HTTPHandler)
+    server = ThreadingHTTPServer((DEFAULT_HOST, args.port), HTTPHandler)
 
     server_thread = threading.Thread(target=start_server, args=(server, args.port), daemon=True)
     server_thread.start()
