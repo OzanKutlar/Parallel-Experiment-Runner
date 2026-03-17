@@ -1,7 +1,6 @@
 cec_functions = [f"BBOB_{i}" for i in range(1, 25)]
 dimensions = [2,5,10,20,40,80, 100];
-populations = [100, 500]
-n_runs = [15]
+n_runs = range(1,16)
 
 shared_params = {
     "fun": cec_functions,
