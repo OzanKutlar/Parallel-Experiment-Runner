@@ -53,6 +53,7 @@ function fileName = runExperiment(data)
     algo.verbose = false;
     algo.plotting = false;
     algo.refresh = 0.05;
+	algo.fasten = 1;
 
     % ------------------------
     % BBBC Algorithm Setup
