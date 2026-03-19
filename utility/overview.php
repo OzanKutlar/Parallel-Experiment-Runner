@@ -143,10 +143,12 @@
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 15px;
+            margin-bottom: 20px;
         }
 
+        /* --- Clickable Stat Cards --- */
         .stat-card {
             background-color: var(--bg-secondary);
             border: 1px solid var(--border);
@@ -158,7 +160,13 @@
             justify-content: center;
             position: relative;
             overflow: hidden;
-            transition: background-color 0.3s ease;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            cursor: pointer;
+        }
+
+        .stat-card:hover {
+            background-color: var(--card-hover-bg);
+            transform: translateY(-2px);
         }
 
         .stat-card::before {
@@ -212,7 +220,13 @@
             display: flex;
             align-items: center;
             gap: 30px;
-            transition: background-color 0.3s ease;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            cursor: pointer;
+        }
+
+        .progress-card:hover {
+            background-color: var(--card-hover-bg);
+            transform: translateY(-2px);
         }
 
         .progress-circle {
@@ -273,7 +287,6 @@
             padding: 15px;
             display: flex;
             flex-direction: column;
-            min-height: 200px;
             transition: background-color 0.3s ease;
         }
 
@@ -289,6 +302,8 @@
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
             gap: 10px;
             padding: 4px;
+            max-height: 300px;
+            overflow-y: auto;
         }
 
         .running-card {
@@ -329,6 +344,27 @@
         .activity-content { flex: 1; }
         .activity-id { color: var(--accent-orange); font-weight: 600; margin-right: 8px; }
 
+        /* --- Tabs Logic --- */
+        .modal-tabs {
+            display: flex; gap: 10px; margin-bottom: 20px;
+            border-bottom: 2px solid var(--bg-tertiary); padding-bottom: 10px;
+        }
+        .modal-tab {
+            background: none; border: none; color: var(--text-secondary);
+            font-size: 16px; cursor: pointer; padding: 5px 10px;
+            border-bottom: 2px solid transparent; transition: all 0.2s;
+            font-family: inherit;
+        }
+        .modal-tab.active { color: var(--accent-orange); border-bottom-color: var(--accent-orange); }
+        .modal-tab:hover:not(.active) { color: var(--text-primary); }
+        .tab-content { display: none; flex-direction: column; gap: 10px; max-height: 50vh; overflow-y: auto; }
+        .tab-content.active { display: flex; }
+        .modal.large .modal-content { max-width: 800px; width: 90%; }
+        
+        .waiting-card { display: flex; justify-content: space-between; align-items: center; padding: 12px; background-color: var(--bg-tertiary); border: 1px solid var(--border); border-left: 4px solid var(--text-secondary); border-radius: 6px; }
+        .waiting-card .card-id { font-size: 16px; font-weight: bold; color: var(--text-primary); }
+        .waiting-card .card-status { font-size: 10px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px; }
+
         .right-panel {
             display: flex;
             flex-direction: column;
@@ -356,15 +392,46 @@
             gap: 8px;
         }
 
+        .worker-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            background-color: var(--bg-tertiary);
+            border-left: 3px solid var(--accent-orange);
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            color: var(--accent-orange);
+            cursor: pointer;
+            user-select: none;
+            margin-top: 4px;
+        }
+        
+        .worker-group-header:hover { background-color: var(--card-hover-bg); }
+        
+        .worker-group-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding-left: 10px;
+            margin-bottom: 6px;
+        }
+        .worker-group-content.collapsed { display: none; }
+
         .worker-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px;
+            padding: 6px 10px;
             background-color: var(--bg-tertiary);
             border-radius: 4px;
-            font-size: 13px;
+            font-size: 12px;
         }
+        
+        /* Ungrouped items without indent */
+        .worker-list > .worker-item { padding: 8px; margin-bottom: 4px; font-size: 13px; }
+
         .worker-name { font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
         .worker-load { background-color: var(--accent-orange); color: var(--bg-primary); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
         body.light-mode .worker-load { color: white; }
@@ -446,9 +513,16 @@
         .modal-header h2 { color: var(--accent-orange); font-size: 20px; }
         .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; }
         
-        .property-item { display: flex; padding: 10px; border-bottom: 1px solid var(--border); }
-        .property-key { color: var(--accent-orange); font-weight: 600; min-width: 150px; }
-        .property-value { color: var(--text-primary); word-break: break-word; }
+        .property-item { display: flex; padding: 10px; border-bottom: 1px solid var(--border); justify-content: space-between; }
+        .property-key { color: var(--text-secondary); font-weight: 600; min-width: 150px; }
+        .property-value { color: var(--text-primary); word-break: break-word; font-weight: bold; text-align: right; }
+        
+        /* Stats detail grid */
+        .stats-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .stats-detail-card { background-color: var(--bg-tertiary); padding: 15px; border-radius: 8px; border-left: 4px solid var(--accent-orange); }
+        .stats-detail-card .val { font-size: 24px; color: var(--accent-orange); font-weight: bold; margin-bottom: 5px; }
+        .stats-detail-card .lbl { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+
         .modal-footer { margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
         .btn-danger { background-color: var(--error); color: white; }
         body.light-mode .btn-danger:hover { background-color: #bb2d3b; }
@@ -466,6 +540,20 @@
 
         @keyframes fadeInItem { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .activity-item, .log-entry { animation: fadeInItem 0.3s ease; }
+
+        @media (max-width: 900px) {
+            .dashboard {
+                grid-template-columns: 1fr; /* Stacks panels vertically */
+                overflow-y: auto;
+            }
+            .left-panel, .right-panel {
+                overflow: visible;
+                height: auto;
+            }
+            .workers-section, .log-section {
+                height: 400px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -493,31 +581,25 @@
 
         <div class="left-panel">
             <div class="stats-grid">
-                <div class="stat-card">
+                <div class="stat-card" style="cursor: default; transform: none;">
                     <div class="stat-value" id="totalExperiments">0</div>
                     <div class="stat-label">Total</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="openExperimentsModal('running')">
                     <div class="stat-value" id="runningCount">0</div>
                     <div class="stat-label">Running</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="openExperimentsModal('finished')">
                     <div class="stat-value" id="completedCount">0</div>
                     <div class="stat-label">Completed</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="openExperimentsModal('waiting')">
                     <div class="stat-value" id="waitingCount">0</div>
                     <div class="stat-label">Waiting</div>
                 </div>
             </div>
 
-            <!-- SEARCH BAR -->
-            <div class="search-container">
-                <i class="fas fa-search" style="color: var(--text-secondary)"></i>
-                <input type="text" id="searchInput" class="search-input" placeholder="Search by Experiment ID or Worker Name..." onkeyup="handleSearch()">
-            </div>
-
-            <div class="progress-card">
+            <div class="progress-card" id="progressCardEl" style="margin-top: auto; margin-bottom: 10px;" onclick="openDetailedStatsModal()">
                 <div class="progress-circle">
                     <svg class="progress-svg" width="120" height="120">
                         <circle class="progress-bg" cx="60" cy="60" r="50"></circle>
@@ -544,22 +626,23 @@
                 </div>
             </div>
 
+            <!-- Inline Experiment Sections -->
             <div class="activity-section">
                 <div class="activity-header">
                     <h3><i class="fas fa-cog"></i> Currently Running</h3>
-                    <span style="color: var(--text-secondary); font-size: 12px;" id="currentlyRunningCount">0 items</span>
+                    <span style="color: var(--text-secondary); font-size: 12px;" id="inlineRunningCount">0 items</span>
                 </div>
-                <div class="running-grid" id="currentlyRunningList">
+                <div class="running-grid" id="inlineRunningList">
                     <div class="empty-state"><i class="fas fa-inbox"></i><p>No experiments running</p></div>
                 </div>
             </div>
 
             <div class="activity-section">
                 <div class="activity-header">
-                    <h3><i class="fas fa-play-circle"></i> Experiments Taken</h3>
-                    <span style="color: var(--text-secondary); font-size: 12px;" id="takenCount">0 items</span>
+                    <h3><i class="fas fa-play-circle"></i> Experiments Running / Taken</h3>
+                    <span style="color: var(--text-secondary); font-size: 12px;" id="inlineTakenCount">0 items</span>
                 </div>
-                <div class="activity-list" id="takenList">
+                <div class="activity-list" id="inlineTakenList">
                     <div class="empty-state"><i class="fas fa-inbox"></i><p>No experiments taken yet</p></div>
                 </div>
             </div>
@@ -567,12 +650,13 @@
             <div class="activity-section">
                 <div class="activity-header">
                     <h3><i class="fas fa-check-circle"></i> Experiments Finished</h3>
-                    <span style="color: var(--text-secondary); font-size: 12px;" id="finishedCount">0 items</span>
+                    <button class="btn-small" onclick="openExperimentsModal('finished')" style="font-size:11px;"><i class="fas fa-expand"></i> View all</button>
                 </div>
-                <div class="activity-list" id="finishedList">
+                <div class="activity-list" id="inlineFinishedList">
                     <div class="empty-state"><i class="fas fa-inbox"></i><p>No experiments finished yet</p></div>
                 </div>
             </div>
+
         </div>
 
         <div class="right-panel">
@@ -606,12 +690,90 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modalTitle">Experiment Details</h2>
-                <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+                <button class="modal-close" onclick="closeModal('experimentModal')"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body" id="modalBody"></div>
             <div class="modal-footer">
-                <button class="btn btn-danger" onclick="resetExperiment()"><i class="fas fa-redo"></i> Reset</button>
-                <button class="btn" onclick="closeModal()">Close</button>
+                <button class="btn btn-danger" id="resetBtn" onclick="resetExperiment()"><i class="fas fa-redo"></i> Reset</button>
+                <button class="btn" onclick="closeModal('experimentModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for all experiments lists -->
+    <div id="experimentsListModal" class="modal large">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Experiments</h2>
+                <button class="modal-close" onclick="closeModal('experimentsListModal')"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="search-container" style="margin-bottom: 20px;">
+                <i class="fas fa-search" style="color: var(--text-secondary)"></i>
+                <input type="text" id="searchInput" class="search-input" placeholder="Search by Experiment ID or Worker Name..." onkeyup="handleSearch()">
+            </div>
+            
+            <div class="modal-tabs">
+                <button class="modal-tab active" onclick="switchExperimentsTab('running')" id="tab-btn-running">Running (<span id="currentlyRunningCount">0</span>)</button>
+                <button class="modal-tab" onclick="switchExperimentsTab('finished')" id="tab-btn-finished">Finished (<span id="finishedCount">0</span>)</button>
+                <button class="modal-tab" onclick="switchExperimentsTab('waiting')" id="tab-btn-waiting">Waiting (<span id="waitingCountInner">0</span>)</button>
+            </div>
+            
+            <div class="tab-content active" id="tab-running">
+                <div class="running-grid" id="currentlyRunningList"></div>
+            </div>
+            
+            <div class="tab-content" id="tab-finished">
+                <div class="activity-list" id="finishedList"></div>
+            </div>
+            
+            <div class="tab-content" id="tab-waiting">
+                <div class="activity-list" id="waitingList"></div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('experimentsListModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Stats Modal -->
+    <div id="detailedStatsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-chart-bar"></i> Time Prediction & System Stats</h2>
+                <button class="modal-close" onclick="closeModal('detailedStatsModal')"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="stats-detail-grid">
+                <div class="stats-detail-card">
+                    <div class="val" id="ds-total-workers">0</div>
+                    <div class="lbl">Active Workers</div>
+                </div>
+                <div class="stats-detail-card">
+                    <div class="val" id="ds-avg-exp-time">0s</div>
+                    <div class="lbl">Avg Time / Experiment</div>
+                </div>
+                <div class="stats-detail-card">
+                    <div class="val" id="ds-total-time">0s</div>
+                    <div class="lbl">Total System Time</div>
+                </div>
+                <div class="stats-detail-card">
+                    <div class="val" id="ds-throughput">0s</div>
+                    <div class="lbl">System Throughput / Exp</div>
+                </div>
+            </div>
+
+            <div class="modal-body">
+                <div class="property-item"><div class="property-key">Total Experiments:</div><div class="property-value" id="ds-total-exp">0</div></div>
+                <div class="property-item"><div class="property-key">Finished Experiments:</div><div class="property-value" id="ds-finished-exp">0</div></div>
+                <div class="property-item"><div class="property-key">Remaining Experiments:</div><div class="property-value" id="ds-remaining-exp">0</div></div>
+                <div class="property-item"><div class="property-key">Data Samples (Sliding Window):</div><div class="property-value" id="ds-window-tasks">0</div></div>
+                <div class="property-item"><div class="property-key">Estimated Time Remaining:</div><div class="property-value" id="ds-eta" style="color:var(--accent-orange)">0s</div></div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('detailedStatsModal')">Close</button>
             </div>
         </div>
     </div>
@@ -620,7 +782,7 @@
         let serverIp = localStorage.getItem('serverIp') || 'localhost';
         let lastLog = -1;
         let lastState = -1;
-        let allStates = [];
+        let latestStates = {}; 
         let totalExperiments = 0;
         let isConnected = false;
         let currentExperimentId = null;
@@ -629,9 +791,13 @@
         let runningCache = "";
         let takenCache = "";
         let finishedCache = "";
+        let inlineRunningCache = "";
+        let inlineTakenCache = "";
+        let inlineFinishedCache = "";
         
         // Search Filter
         let searchText = "";
+        let searchTimeout;
 
         // ETA Variables
         let previousFinishedCount = 0;
@@ -698,40 +864,44 @@
         }
 
         function fetchAll() {
-            fetch(`http://${serverIp}:3753/logs`, { headers: { 'lastLog': lastLog } })
-                .then(r => r.json()).then(d => { d.forEach(l => { addLogEntry(l); lastLog = l.ID; }); })
-                .catch(e => console.error(e));
+            const logsPromise = fetch(`http://${serverIp}:3753/logs`, { headers: { 'lastLog': lastLog } })
+                .then(r => r.json()).then(d => { d.forEach(l => { addLogEntry(l); lastLog = l.ID; }); });
 
-            fetch(`http://${serverIp}:3753/status`, { headers: { 'lastLog': lastState } })
+            const statusPromise = fetch(`http://${serverIp}:3753/status`, { headers: { 'lastLog': lastState } })
                 .then(r => r.json()).then(d => {
                     if (d.length > 0) {
-                        allStates = [...allStates, ...d];
-                        d.forEach(s => lastState = s.ID);
+                        d.forEach(s => {
+                            lastState = s.ID;
+                            latestStates[s.index] = s;
+                        });
                         updateDashboard();
                     }
-                })
-                .catch(e => console.error(e));
+                });
 
-            // Fetch server-side calculated stats
-            fetch(`http://${serverIp}:3753/timeStats`)
+            const statsPromise = fetch(`http://${serverIp}:3753/timeStats`)
                 .then(r => r.json())
-                .then(stats => updateTimeStats(stats))
-                .catch(e => console.error(e));
+                .then(stats => updateTimeStats(stats));
+
+            Promise.all([logsPromise, statusPromise, statsPromise])
+                .catch(e => console.error(e))
+                .finally(() => {
+                    // Queue the next fetch ONLY after this one finishes or fails
+                    setTimeout(fetchAll, 2000);
+                });
         }
 
         function handleSearch() {
-            searchText = document.getElementById('searchInput').value.toLowerCase();
-            // Force re-render with current state data
-            updateDashboard(true);
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchText = document.getElementById('searchInput').value.toLowerCase();
+                updateDashboard(true);
+            }, 300);
         }
 
         function updateDashboard(forceRender = false) {
             const taken = [];
             const finished = [];
             const running = [];
-            const latestStates = {};
-
-            allStates.forEach(state => latestStates[state.index] = state);
 
             Object.values(latestStates).forEach(state => {
                 if (state.state === 'Finished') finished.push(state);
@@ -742,21 +912,28 @@
             });
 
             // Update Counts (Global, ignored by search for stats)
+            const waitingCount = totalExperiments - finished.length - running.length;
             document.getElementById('runningCount').textContent = running.length;
             document.getElementById('completedCount').textContent = finished.length;
-            document.getElementById('waitingCount').textContent = totalExperiments - finished.length - running.length;
-
+            document.getElementById('waitingCount').textContent = waitingCount > 0 ? waitingCount : 0;
+            
+            document.getElementById('currentlyRunningCount').textContent = running.length;
+            document.getElementById('finishedCount').textContent = finished.length;
+            document.getElementById('waitingCountInner').textContent = waitingCount > 0 ? waitingCount : 0;
 
             // Active Workers Panel
             updateActiveWorkers(running);
 
             // Progress Bar
-            const percent = totalExperiments > 0 ? Math.round((finished.length / totalExperiments) * 100) : 0;
+            const rawPercent = totalExperiments > 0 ? (finished.length / totalExperiments) * 100 : 0;
+            const percent = Math.round(rawPercent);
             const circumference = 314.15; // 2 * pi * 50
-            document.getElementById('progressBar').style.strokeDashoffset = circumference - (percent / 100) * circumference;
-            document.getElementById('progressPercent').textContent = percent + '%';
-            document.getElementById('progressCompleted').textContent = `${finished.length} / ${totalExperiments}`;
-            document.getElementById('progressRunning').textContent = running.length;
+            if (document.getElementById('progressBar')) {
+                document.getElementById('progressBar').style.strokeDashoffset = circumference - (rawPercent / 100) * circumference;
+                document.getElementById('progressPercent').textContent = percent + '%';
+                document.getElementById('progressCompleted').textContent = `${finished.length} / ${totalExperiments}`;
+                document.getElementById('progressRunning').textContent = running.length;
+            }
 
             // Filter lists based on search
             const filterFn = (item) => {
@@ -765,16 +942,114 @@
             };
 
             updateRunningGrid(running.reverse().filter(filterFn), forceRender);
-            updateActivityList('takenList', taken.reverse().filter(filterFn), 'taken', 'takenCount', forceRender);
-            updateActivityList('finishedList', finished.reverse().filter(filterFn), 'finished', 'finishedCount', forceRender);
+            updateActivityList('finishedList', finished.slice().reverse().filter(filterFn), 'finished', 'finishedCount', forceRender);
+            
+            // Only compute the expensive waiting list when the modal is actually open
+            const listModalOpen = document.getElementById('experimentsListModal').classList.contains('active');
+            if (listModalOpen) {
+                updateWaitingList(waitingCount > 0 ? waitingCount : 0, running, finished, filterFn, forceRender);
+            }
+
+            // Also update inline sections
+            updateInlineSections(running, taken, finished, filterFn, forceRender);
         }
+
+        function updateInlineSections(running, taken, finished, filterFn, forceRender) {
+            // Currently Running (grid cards) — with hash cache
+            const inlineRunEl = document.getElementById('inlineRunningList');
+            const inlineRunCount = document.getElementById('inlineRunningCount');
+            if (inlineRunEl) {
+                const filtered = running.slice().filter(filterFn);
+                const hash = filtered.map(i => i.index).join(',');
+                if (forceRender || hash !== inlineRunningCache) {
+                    inlineRunningCache = hash;
+                    inlineRunCount.textContent = filtered.length + ' items';
+                    if (filtered.length === 0) {
+                        inlineRunEl.innerHTML = `<div class="empty-state"><i class="fas fa-inbox"></i><p>No experiments running</p></div>`;
+                    } else {
+                        inlineRunEl.innerHTML = filtered.map(item => `
+                            <div class="running-card" onclick="showExperimentDetails(${item.index})">
+                                <div class="card-id">#${item.index} <i class="fas fa-cog fa-spin"></i></div>
+                                <div class="card-worker"><i class="fas fa-server"></i> <strong>${item.sentTo}</strong></div>
+                                <div class="card-status">Running</div>
+                            </div>
+                        `).join('');
+                    }
+                }
+            }
+
+            // Taken list — with hash cache
+            const inlineTakenEl = document.getElementById('inlineTakenList');
+            const inlineTakenCount = document.getElementById('inlineTakenCount');
+            if (inlineTakenEl) {
+                const filtered = taken.slice().reverse().filter(filterFn);
+                const hash = filtered.map(i => i.index).join(',');
+                if (forceRender || hash !== inlineTakenCache) {
+                    inlineTakenCache = hash;
+                    inlineTakenCount.textContent = filtered.length + ' items';
+                    if (filtered.length === 0) {
+                        inlineTakenEl.innerHTML = `<div class="empty-state"><i class="fas fa-inbox"></i><p>No experiments taken yet</p></div>`;
+                    } else {
+                        inlineTakenEl.innerHTML = filtered.map(item => `
+                            <div class="activity-item taken" onclick="showExperimentDetails(${item.index})">
+                                <div class="activity-content">
+                                    <span class="activity-id">#${item.index}</span>
+                                    <span>Running on <strong>${item.sentTo}</strong></span>
+                                </div>
+                                <div class="status-badge running"><i class="fas fa-cog fa-spin"></i> Running</div>
+                            </div>
+                        `).join('');
+                    }
+                }
+            }
+
+            // Finished list (inline, capped at 50) — with hash cache
+            const inlineFinEl = document.getElementById('inlineFinishedList');
+            if (inlineFinEl) {
+                const filtered = finished.slice().reverse().filter(filterFn);
+                const hash = finished.length + ':' + filtered.slice(0, 50).map(i => i.index).join(',');
+                if (forceRender || hash !== inlineFinishedCache) {
+                    inlineFinishedCache = hash;
+                    if (filtered.length === 0) {
+                        inlineFinEl.innerHTML = `<div class="empty-state"><i class="fas fa-inbox"></i><p>No experiments finished yet</p></div>`;
+                    } else {
+                        const display = filtered.slice(0, 50);
+                        const moreText = filtered.length > 50 ? `<div style="text-align:center;padding:10px;color:var(--text-secondary);font-size:12px;">+ ${filtered.length - 50} more — <a href="#" onclick="openExperimentsModal('finished'); return false;" style="color:var(--accent-orange);">View all</a></div>` : '';
+                        inlineFinEl.innerHTML = display.map(item => `
+                            <div class="activity-item finished" onclick="showExperimentDetails(${item.index})">
+                                <div class="activity-content">
+                                    <span class="activity-id">#${item.index}</span>
+                                    <span>Finished by <strong>${item.sentTo}</strong></span>
+                                </div>
+                                <div class="status-badge finished"><i class="fas fa-check"></i> Done</div>
+                            </div>
+                        `).join('') + moreText;
+                    }
+                }
+            }
+        }
+
+        function switchExperimentsTab(tabName) {
+            document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById('tab-btn-' + tabName).classList.add('active');
+            document.getElementById('tab-' + tabName).classList.add('active');
+        }
+
+        function openExperimentsModal(tabName) {
+            switchExperimentsTab(tabName);
+            document.getElementById('experimentsListModal').classList.add('active');
+        }
+
+        let globalTimeStatsCache = null;
 
         // --- TIME STATS UI LOGIC ---
         function updateTimeStats(stats) {
+            globalTimeStatsCache = stats;
             const etaEl = document.getElementById('etaValue');
             const etaSeconds = stats.eta_seconds;
 
-            if (etaSeconds === 0 && document.getElementById('progressPercent').textContent === '100%') {
+            if (etaSeconds === 0 && document.getElementById('progressPercent') && document.getElementById('progressPercent').textContent === '100%') {
                 etaEl.innerText = "Done";
                 return;
             }
@@ -789,17 +1064,65 @@
                 return;
             }
             
-            // Format ETA
-            if (etaSeconds < 60) etaEl.innerText = `~${Math.round(etaSeconds)}s remaining`;
-            else if (etaSeconds < 3600) etaEl.innerText = `~${Math.round(etaSeconds/60)}m remaining`;
-            else {
-                const h = Math.floor(etaSeconds / 3600);
-                const m = Math.round((etaSeconds % 3600) / 60);
-                etaEl.innerText = `~${h}h ${m}m remaining`;
+            etaEl.innerText = formatDuration(etaSeconds) + ' remaining';
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds || seconds <= 0) return '0s';
+            if (seconds < 60) return `${Math.round(seconds)}s`;
+            if (seconds < 3600) return `${Math.round(seconds/60)}m ${Math.round(seconds%60)}s`;
+            const h = Math.floor(seconds / 3600);
+            const m = Math.round((seconds % 3600) / 60);
+            return `${h}h ${m}m`;
+        }
+
+        function openDetailedStatsModal() {
+            // Calculate active workers from runninglist
+            const running = [];
+            const finished = [];
+            
+            Object.values(latestStates).forEach(state => {
+                if (state.state === 'Finished') finished.push(state);
+                else if (state.state === 'Running') running.push(state);
+            });
+
+            const uniqueWorkers = new Set();
+            running.forEach(item => uniqueWorkers.add(item.sentTo || "Unknown"));
+            
+            document.getElementById('ds-total-workers').textContent = uniqueWorkers.size;
+            document.getElementById('ds-total-exp').textContent = totalExperiments;
+            document.getElementById('ds-finished-exp').textContent = finished.length;
+            document.getElementById('ds-remaining-exp').textContent = totalExperiments - finished.length;
+
+            if (globalTimeStatsCache) {
+                document.getElementById('ds-window-tasks').textContent = globalTimeStatsCache.window_tasks || 0;
+                document.getElementById('ds-eta').textContent = formatDuration(globalTimeStatsCache.eta_seconds);
+                
+                // Reverse engineer avg time and total time
+                // eta = remaining * throughput => throughput = eta / remaining
+                const remaining = totalExperiments - finished.length;
+                let throughput = 0;
+                if (remaining > 0 && globalTimeStatsCache.eta_seconds > 0) {
+                    throughput = globalTimeStatsCache.eta_seconds / remaining;
+                }
+                
+                document.getElementById('ds-throughput').textContent = formatDuration(throughput);
+                
+                // throughput = avg_duration_per_task / active_workers => avg_duration = throughput * active_workers
+                const avgDuration = throughput * (globalTimeStatsCache.active_workers || 1);
+                document.getElementById('ds-avg-exp-time').textContent = formatDuration(avgDuration);
+                
+                // total time = finished * avgDuration
+                document.getElementById('ds-total-time').textContent = formatDuration(finished.length * avgDuration);
             }
+
+            document.getElementById('detailedStatsModal').classList.add('active');
         }
 
         // --- ACTIVE WORKERS LOGIC ---
+        // Track which worker groups the user has collapsed
+        const collapsedGroups = new Set();
+
         function updateActiveWorkers(runningList) {
             const counts = {};
             runningList.forEach(item => {
@@ -813,21 +1136,138 @@
                 return;
             }
 
-            listEl.innerHTML = Object.entries(counts).map(([name, count]) => `
-                <div class="worker-item">
-                    <div class="worker-name"><i class="fas fa-server"></i> ${name}</div>
-                    <div class="worker-load">${count} jobs</div>
-                </div>
-            `).join('');
+            // Group workers
+            const groups = {};
+            const ungrouped = {};
+
+            Object.entries(counts).forEach(([name, count]) => {
+                // Flexible prefix matching: capture the lab group from names like
+                // LAB1_PC01, LAB_1_PC01, LAB2PC03, ROOM_A_01, etc.
+                // Strategy: split by underscore. If there are ≥2 parts AND the first
+                // part (or first 2 parts) look like a "group prefix", group by it.
+                const parts = name.split('_');
+                let groupKey = null;
+                if (parts.length >= 2) {
+                    // Check if first part is purely letters, or letters+digits (like "LAB1")
+                    // and second part (if it's a single digit) also belongs to the group
+                    const part0 = parts[0]; // e.g. "LAB" or "LAB1"
+                    const part1 = parts[1]; // e.g. "1" or "PC01"
+                    
+                    // If first part is letters only and second part is purely a number => group = "LAB_1"
+                    if (/^[A-Za-z]+$/.test(part0) && /^\d+$/.test(part1)) {
+                        groupKey = `${part0}_${part1}`; // e.g. LAB_1
+                    } 
+                    // If first part has letters+digits (like "LAB1") => group = "LAB1"
+                    else if (/^[A-Za-z]+\d+$/.test(part0) && parts.length >= 2) {
+                        groupKey = part0; // e.g. LAB1
+                    }
+                    // If first part is letters only and second is also letters+digits (like "ROOM_A") => group = "ROOM_A"
+                    else if (/^[A-Za-z]+$/.test(part0) && /^[A-Za-z]/.test(part1) && parts.length >= 3) {
+                        groupKey = `${part0}_${part1}`;
+                    }
+                }
+                if (groupKey) {
+                    if (!groups[groupKey]) groups[groupKey] = {};
+                    groups[groupKey][name] = count;
+                } else {
+                    ungrouped[name] = count;
+                }
+            });
+
+            let html = '';
+
+            // Snapshot collapsed state from existing DOM before wiping it
+            listEl.querySelectorAll('.worker-group-header').forEach(header => {
+                const content = header.nextElementSibling;
+                const label = header.getAttribute('data-group');
+                if (label && content && content.classList.contains('collapsed')) {
+                    collapsedGroups.add(label);
+                } else if (label) {
+                    collapsedGroups.delete(label);
+                }
+            });
+
+            // Render groups
+            Object.keys(groups).sort().forEach(groupPrefix => {
+                let groupJobs = 0;
+                let groupWorkers = groups[groupPrefix];
+                const workerRows = Object.keys(groupWorkers).sort().map(w => {
+                    groupJobs += groupWorkers[w];
+                    return `
+                        <div class="worker-item">
+                            <div class="worker-name"><i class="fas fa-desktop"></i> ${w}</div>
+                            <div class="worker-load">${groupWorkers[w]} jobs</div>
+                        </div>
+                    `;
+                }).join('');
+
+                html += `
+                    <div class="worker-group-header" data-group="${groupPrefix}" onclick="toggleWorkerGroup(this)">
+                        <span><i class="fas fa-network-wired"></i> ${groupPrefix} (${Object.keys(groupWorkers).length} PCs)</span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                           <span class="worker-load">${groupJobs} jobs</span>
+                           <i class="fas fa-chevron-down" style="font-size:10px;"></i>
+                        </div>
+                    </div>
+                    <div class="worker-group-content">
+                        ${workerRows}
+                    </div>
+                `;
+            });
+
+            // Render ungrouped
+            if (Object.keys(ungrouped).length > 0) {
+                if (Object.keys(groups).length > 0) {
+                    html += `<div style="font-size: 11px; color: var(--text-secondary); margin: 8px 0 4px 4px; text-transform: uppercase;">Other Workers</div>`;
+                }
+                html += Object.keys(ungrouped).sort().map(w => `
+                    <div class="worker-item">
+                        <div class="worker-name"><i class="fas fa-server"></i> ${w}</div>
+                        <div class="worker-load">${ungrouped[w]} jobs</div>
+                    </div>
+                `).join('');
+            }
+
+            listEl.innerHTML = html;
+
+            // Re-apply collapsed state
+            listEl.querySelectorAll('.worker-group-header').forEach(header => {
+                const label = header.getAttribute('data-group');
+                if (label && collapsedGroups.has(label)) {
+                    header.nextElementSibling.classList.add('collapsed');
+                    const chevron = header.querySelector('.fa-chevron-down');
+                    if (chevron) { chevron.classList.remove('fa-chevron-down'); chevron.classList.add('fa-chevron-right'); }
+                }
+            });
         }
 
+        function toggleWorkerGroup(header) {
+            const label = header.getAttribute('data-group');
+            const content = header.nextElementSibling;
+            const chevron = header.querySelector('i.fa-chevron-down, i.fa-chevron-right');
+            const isNowCollapsed = content.classList.toggle('collapsed');
+            if (chevron) {
+                chevron.classList.toggle('fa-chevron-down', !isNowCollapsed);
+                chevron.classList.toggle('fa-chevron-right', isNowCollapsed);
+            }
+            if (label) {
+                if (isNowCollapsed) collapsedGroups.add(label);
+                else collapsedGroups.delete(label);
+            }
+        }
+
+        // Only update the modal lists when the modal is actually visible
         function updateRunningGrid(items, force) {
             const listEl = document.getElementById('currentlyRunningList');
-            const dataHash = JSON.stringify(items);
+            if (!listEl) return;
+            // Skip re-render if modal is closed and data hasn't changed
+            const isOpen = document.getElementById('experimentsListModal').classList.contains('active');
+            if (!isOpen && !force) return;
+            const dataHash = JSON.stringify(items.map(i => i.index));
             if (!force && runningCache === dataHash) return;
             runningCache = dataHash;
 
-            document.getElementById('currentlyRunningCount').textContent = items.length + ' items';
+            document.getElementById('currentlyRunningCount').textContent = items.length;
             if (items.length === 0) {
                 listEl.innerHTML = `<div class="empty-state"><i class="fas fa-inbox"></i><p>No experiments running</p></div>`;
                 return;
@@ -844,15 +1284,18 @@
 
         function updateActivityList(listId, items, type, countId, force) {
             const listEl = document.getElementById(listId);
-            const dataHash = JSON.stringify(items);
+            if (!listEl) return;
+            // Skip if modal is closed and nothing forced
+            const isOpen = document.getElementById('experimentsListModal').classList.contains('active');
+            if (!isOpen && !force) return;
+            const dataHash = JSON.stringify(items.map(i => i.index));
             
             if (!force) {
-                if (type === 'taken' && takenCache === dataHash) return;
                 if (type === 'finished' && finishedCache === dataHash) return;
             }
-            if (type === 'taken') takenCache = dataHash; else finishedCache = dataHash;
+            if (type === 'finished') finishedCache = dataHash;
 
-            document.getElementById(countId).textContent = items.length + ' items';
+            document.getElementById('finishedCount').textContent = items.length;
 
             if (items.length === 0) {
                 listEl.innerHTML = `<div class="empty-state"><i class="fas fa-inbox"></i><p>No experiments ${type}</p></div>`;
@@ -872,6 +1315,49 @@
             `).join('');
         }
 
+        function updateWaitingList(waitingCount, runningList, finishedList, filterFn, force) {
+            const listEl = document.getElementById('waitingList');
+            document.getElementById('waitingCountInner').textContent = waitingCount;
+            
+            if (waitingCount === 0) {
+                listEl.innerHTML = `<div class="empty-state"><i class="fas fa-inbox"></i><p>No experiments waiting</p></div>`;
+                return;
+            }
+
+            // Waiting items are IDs that are neither finished nor running.
+            // Since we just have totalExperiments, we can generate them.
+            // This could be large, so we cap it to 100 for display to avoid lag.
+            
+            const activeIds = new Set();
+            runningList.forEach(item => activeIds.add(item.index));
+            finishedList.forEach(item => activeIds.add(item.index));
+            
+            let waitingItems = [];
+            for (let i = 1; i <= totalExperiments; i++) {
+                if (!activeIds.has(i)) {
+                    waitingItems.push({ index: i, sentTo: 'Waiting' });
+                }
+            }
+            
+            waitingItems = waitingItems.filter(filterFn);
+            
+            if (waitingItems.length === 0) {
+                listEl.innerHTML = `<div class="empty-state"><i class="fas fa-search"></i><p>No waiting experiments match search</p></div>`;
+                return;
+            }
+            
+            // Limit render to 100 max
+            const displayItems = waitingItems.slice(0, 100);
+            const moreText = waitingItems.length > 100 ? `<div style="text-align:center; padding: 10px; color: var(--text-secondary); font-size: 12px;">+ ${waitingItems.length - 100} more waiting...</div>` : '';
+
+            listEl.innerHTML = displayItems.map(item => `
+                <div class="waiting-card">
+                    <div class="card-id">#${item.index}</div>
+                    <div class="card-status">Waiting</div>
+                </div>
+            `).join('') + moreText;
+        }
+
         function showExperimentDetails(id) {
             currentExperimentId = id;
             fetch(`http://${serverIp}:3753/info`, { headers: { 'index': id } })
@@ -886,7 +1372,7 @@
                 document.getElementById('experimentModal').classList.add('active');
             });
         }
-        function closeModal() { document.getElementById('experimentModal').classList.remove('active'); }
+        function closeModal(id) { document.getElementById(id || 'experimentModal').classList.remove('active'); }
 
         function resetExperiment() {
             if (!currentExperimentId || !confirm(`Reset experiment #${currentExperimentId}?`)) return;
@@ -912,8 +1398,8 @@
             entry.appendChild(msgSpan);
             
             if(list.querySelector('.empty-state')) list.innerHTML = '';
-            list.insertBefore(entry, list.firstChild);
-            while (list.children.length > 100) list.removeChild(list.lastChild);
+            list.appendChild(entry);
+            while (list.children.length > 100) list.removeChild(list.firstChild);
         }
 
         function clearLogs() { document.getElementById('logList').innerHTML = `<div class="empty-state"><i class="fas fa-scroll"></i><p>No logs</p></div>`; }
@@ -922,8 +1408,18 @@
         window.onload = function() {
             initTheme();
             loadInitialData();
-            setInterval(fetchAll, 2000);
+            // Switched to recursive setTimeout in fetchAll
+            // setInterval(fetchAll, 2000); 
             setInterval(checkAutoTimeSwitch, 60000);
+
+            // Escape key to close modals
+            document.addEventListener('keydown', function(event) {
+                if (event.key === "Escape") {
+                    document.querySelectorAll('.modal.active').forEach(modal => {
+                        modal.classList.remove('active');
+                    });
+                }
+            });
         }
     </script>
 </body>
