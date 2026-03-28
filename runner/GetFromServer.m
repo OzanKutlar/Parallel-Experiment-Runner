@@ -53,45 +53,66 @@ function fileName = runExperiment(data)
     algo.verbose = false;
     algo.plotting = false;
     algo.refresh = 0.05;
-	algo.fasten = 1;
 
     % ------------------------
-    % BBBC Algorithm Setup
+    % Algorithm Setup (from setup_experiments)
     % ------------------------
-    if strcmp(data.algo, 'BBBC')
-        algo.pop_size = 10 * op.dim; % Population size based on dimensions
-        algo.survival = struct;
-        algo.survival.schema = data.bbbc_survival;
-		
-
-
-        [best, error, runtime, convergence_array] = run_BBBC(op, algo);
-
-
-    % ------------------------
-    % ES & ES-SA Setup
-    % ------------------------
-    elseif strcmp(data.algo, 'ES') || strcmp(data.algo, 'ES-SA')
-        algo.lambda = 10 * op.dim; % lambda size based on dimensions
+    if strcmp(data.algo, 'RGA_generational')
+        algo.pop_size           = data.m_val * 4 * op.dim;
+        algo.crossover          = struct;
+        algo.crossover.p_c      = 0.9;
+        algo.crossover.eta_c    = 20;
+        algo.mutation           = struct;
+        algo.mutation.p_m       = 1/op.dim;
+        algo.mutation.eta_m     = 20;
+        algo.off_size           = algo.pop_size;
+        algo.survival           = struct;     
+        algo.survival.schema    = "α";     
+        algo.survival.alpha     = 40;       
         
-        if data.mu_type == 1
-            algo.mu = 1;
-        elseif data.mu_type == 2
-            algo.mu = floor(algo.lambda / 4);
-        else
-            algo.mu = 1; % Fallback
-        end
+        [best, error, runtime, convergence_array] = run_RGA_generational(op, algo);
 
-        algo.sigma = (op.bounds(2)-op.bounds(1))/(2*sqrt(op.dim)); 
+    elseif strcmp(data.algo, 'MISEGA_generational')
+        algo.selection_methods  = {"tournament","rank","sus","truncation"};
+        algo.partition_size     = data.m_val * op.dim;
+        algo.crossover          = struct;
+        algo.crossover.p_c      = 0.9;
+        algo.crossover.eta_c    = 20;
+        algo.mutation           = struct;
+        algo.mutation.p_m       = 1/op.dim;
+        algo.mutation.eta_m     = 20;
+        algo.recombination_mode = data.recomb;
+        algo.mixed_modality     = data.modality;
+        algo.survival           = struct;     
+        algo.survival.schema    = "α";
+        algo.survival.alpha     = 40;
         
-        algo.survival = struct;
-        algo.survival.schema = data.es_survival;
+        [best, error, runtime, convergence_array] = run_MISEGA_generational(op, algo);
 
-        if strcmp(data.algo, 'ES')
-            [best, error, runtime, convergence_array] = run_ES_OneFifth(op, algo);
-        elseif strcmp(data.algo, 'ES-SA')
-            [best, error, runtime, convergence_array] = run_ES_SelfAdaptive(op, algo);
-        end
+    elseif strcmp(data.algo, 'RGA_steady_state')
+        algo.pop_size           = data.m_val * 4 * op.dim;
+        algo.crossover          = struct;
+        algo.crossover.p_c      = 0.9;
+        algo.crossover.eta_c    = 20;
+        algo.mutation           = struct;
+        algo.mutation.p_m       = 1/op.dim;
+        algo.mutation.eta_m     = 20;
+        
+        [best, error, runtime, convergence_array] = run_RGA_steady_state(op, algo);
+
+    elseif strcmp(data.algo, 'MISEGA_steady_state')
+        algo.selection_methods  = {"tournament","rank","sus","truncation"};
+        algo.partition_size     = data.m_val * op.dim;
+        algo.crossover          = struct;
+        algo.crossover.p_c      = 0.9;
+        algo.crossover.eta_c    = 20;
+        algo.mutation           = struct;
+        algo.mutation.p_m       = 1/op.dim;
+        algo.mutation.eta_m     = 20;
+        algo.recombination_mode = data.recomb;
+        algo.mixed_modality     = data.modality;
+        
+        [best, error, runtime, convergence_array] = run_MISEGA_steady_state(op, algo);
     end
 
     % ------------------------
