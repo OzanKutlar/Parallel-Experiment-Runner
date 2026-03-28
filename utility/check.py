@@ -24,6 +24,7 @@ from textual.widgets import (
     OptionList,
     RichLog,
 )
+from textual.widgets.option_list import Option
 from textual.screen import Screen
 from textual import work, on
 from textual.binding import Binding
@@ -113,12 +114,15 @@ class SelectionScreen(Screen):
                 yield Static(
                     "[dim]Select a parameter file to begin[/]", id="sel-sub"
                 )
-                yield OptionList(*self.param_files, id="file-list")
+                yield OptionList(
+                    *[Option(f, id=f) for f in self.param_files],
+                    id="file-list",
+                )
         yield Footer()
 
     @on(OptionList.OptionSelected)
     def on_selected(self, event: OptionList.OptionSelected) -> None:
-        self.app.selected_param = self.param_files[event.option_index]
+        self.app.selected_param = event.option.id
         self.app.push_screen(CheckingScreen())
 
 
@@ -319,7 +323,8 @@ class CheckerApp(App):
     #sel-box {
         width: 64;
         height: auto;
-        max-height: 80%;
+        min-height: 10;
+        max-height: 80vh;
         padding: 2 4;
         border: tall $accent;
         background: $panel;
@@ -334,7 +339,9 @@ class CheckerApp(App):
     }
     #file-list {
         height: auto;
+        min-height: 3;
         max-height: 20;
+        overflow-y: auto;
     }
 
     /* ── Checking ── */
