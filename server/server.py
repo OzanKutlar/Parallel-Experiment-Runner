@@ -313,6 +313,19 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(response, indent=2).encode())
             return
+
+        if self.path == "/batchInfo":
+            with experimenter.lock:
+                batch = []
+                for i, item in enumerate(experimenter.data_array):
+                    entry = {"index": i + 1}
+                    entry.update(item)
+                    batch.append(entry)
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(batch).encode())
+            return
             
         if self.path == "/reset":
             index = int(self.headers.get('index', 0)) - 1

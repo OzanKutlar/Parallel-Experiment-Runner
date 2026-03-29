@@ -6,6 +6,8 @@ times of the experiments. It calculates the mean and standard deviation of
 the durations and highlights statistical outliers (too fast or too slow).
 It also groups the anomalies by their most common data parameters.
 
+Uses the /batchInfo endpoint to fetch all experiment data in one request.
+
 Usage:
     python anomaly_detector.py [--host 127.0.0.1] [--port 3753]
 """
@@ -30,6 +32,23 @@ from textual.widgets import (
     Static,
     Tree,
 )
+
+
+def format_duration(seconds: float) -> str:
+    """Convert seconds to a human-readable Xh Xm Xs string."""
+    if seconds < 0:
+        return "N/A"
+    total = int(round(seconds))
+    h = total // 3600
+    m = (total % 3600) // 60
+    s = total % 60
+    parts = []
+    if h > 0:
+        parts.append(f"{h}h")
+    if m > 0:
+        parts.append(f"{m}m")
+    parts.append(f"{s}s")
+    return " ".join(parts)
 
 
 class CheckingScreen(Screen):
@@ -67,25 +86,23 @@ class CheckingScreen(Screen):
         data_panel = self.query_one("#data-panel", Static)
         node_data = event.node.data
         if node_data:
-            # It's an anomaly leaf node
             d = node_data.get("data", {})
             duration = node_data.get("duration", 0)
             idx = node_data.get("index", "?")
-            
-            lines = [f"[b]Experiment {idx}[/] - Duration: [yellow]{duration:.2f}s[/]\n"]
+
+            lines = [f"[b]Experiment {idx}[/] - Duration: [yellow]{format_duration(duration)}[/]\n"]
             for k, v in d.items():
-                if k not in ("id", "Taken At", "Completed At"):
+                if k not in ("id", "Taken At", "Completed At", "index"):
                     lines.append(f"[cyan]{k}[/]: {v}")
-                    
+
             lines.append("\n[dim]Timestamps:[/]")
             if "Taken At" in d:
                 lines.append(f" Taken At: {d['Taken At']}")
             if "Completed At" in d:
                 lines.append(f" Completed At: {d['Completed At']}")
-                
+
             data_panel.update("\n".join(lines))
         else:
-            # Root or group node
             data_panel.update("Select a specific experiment below a group to view its data.")
 
     def group_anomalies(self, anomalies):
@@ -93,53 +110,51 @@ class CheckingScreen(Screen):
         for a in anomalies:
             data = a["data"]
             for k, v in data.items():
-                if k in ("id", "Taken At", "Completed At"):
+                if k in ("id", "Taken At", "Completed At", "index"):
                     continue
                 pair = (k, str(v))
                 freq[pair] = freq.get(pair, 0) + 1
-                
+
         groups = {}
         for a in anomalies:
             data = a["data"]
             best_pair = None
             best_count = 1
-            
+
             for k, v in data.items():
-                if k in ("id", "Taken At", "Completed At"):
+                if k in ("id", "Taken At", "Completed At", "index"):
                     continue
                 pair = (k, str(v))
                 if freq[pair] > best_count:
                     best_count = freq[pair]
                     best_pair = pair
-                    
+
             if best_pair:
                 group_name = f"{best_pair[0]} = {best_pair[1]}"
             else:
                 group_name = "Unique / Uncategorized"
-                
+
             if group_name not in groups:
                 groups[group_name] = []
             groups[group_name].append(a)
-            
-        # Sort groups by size (descending)
+
         return dict(sorted(groups.items(), key=lambda item: len(item[1]), reverse=True))
 
     def update_tree(self, anomalies):
         tree = self.query_one("#anomaly-tree", Tree)
         tree.clear()
-        
+
         groups = self.group_anomalies(anomalies)
-        
+
         for group_name, group_items in groups.items():
             group_node = tree.root.add(f"[b]{group_name}[/] ({len(group_items)})", expand=True)
             for item in group_items:
                 idx = item["index"]
                 d = item["duration"]
-                
-                status = "[red]Too Long[/red]" if d > self.mean else "[blue]Too Short[/blue]"
-                label = f"Exp {idx}: {d:.1f}s {status}"
-                group_node.add_leaf(label, data=item)
 
+                status = "[red]Too Long[/red]" if d > self.mean else "[blue]Too Short[/blue]"
+                label = f"Exp {idx}: {format_duration(d)} {status}"
+                group_node.add_leaf(label, data=item)
 
     @work(exclusive=True, thread=True)
     def run_check(self) -> None:
@@ -149,6 +164,7 @@ class CheckingScreen(Screen):
 
         base_url = f"http://{self.app.host}:{self.app.port}"
 
+        # 1. Check connection & get total
         try:
             req = urllib.request.Request(f"{base_url}/getNum")
             with urllib.request.urlopen(req, timeout=5) as response:
@@ -170,79 +186,91 @@ class CheckingScreen(Screen):
             )
             return
 
-        self.app.call_from_thread(setattr, pbar, "total", total_experiments)
         self.app.call_from_thread(
             status_w.update,
-            f"  [green]✓ Connected[/]  •  [bold]{total_experiments:,}[/] experiments to check.",
+            f"  [green]✓ Connected[/]  •  [bold]{total_experiments:,}[/] experiments  •  Fetching batch data…",
         )
 
+        # 2. Fetch all data in one batch request
+        try:
+            req = urllib.request.Request(f"{base_url}/batchInfo")
+            with urllib.request.urlopen(req, timeout=30) as response:
+                all_data = json.loads(response.read().decode())
+        except Exception as e:
+            self.app.call_from_thread(
+                status_w.update,
+                f"[bold red]✗ Failed to fetch batch data: {e}[/]",
+            )
+            return
+
+        self.app.call_from_thread(setattr, pbar, "total", len(all_data))
+        self.app.call_from_thread(
+            status_w.update,
+            f"  [green]✓ Received[/]  •  [bold]{len(all_data):,}[/] experiments  •  Analyzing…",
+        )
+
+        # 3. Parse durations
         fmt = "%Y-%m-%d %H:%M:%S"
-
-        for i in range(1, total_experiments + 1):
-            try:
-                req = urllib.request.Request(f"{base_url}/info")
-                req.add_header("index", str(i))
-                with urllib.request.urlopen(req, timeout=5) as response:
-                    data = json.loads(response.read().decode())
-
-                if "Taken At" in data and "Completed At" in data:
+        for i, data in enumerate(all_data):
+            idx = data.get("index", i + 1)
+            if "Taken At" in data and "Completed At" in data:
+                try:
                     start_time = datetime.strptime(data["Taken At"], fmt)
                     end_time = datetime.strptime(data["Completed At"], fmt)
                     duration = (end_time - start_time).total_seconds()
-
                     if duration > 0:
                         self.durations.append(
-                            {"index": i, "duration": duration, "data": data}
+                            {"index": idx, "duration": duration, "data": data}
                         )
+                except Exception:
+                    pass
 
-                self.app.call_from_thread(pbar.advance, 1)
+            self.app.call_from_thread(pbar.advance, 1)
 
-                if i % 10 == 0 or i == total_experiments:
-                    if len(self.durations) > 1:
-                        dur_vals = [d["duration"] for d in self.durations]
-                        self.mean = statistics.mean(dur_vals)
-                        self.stdev = statistics.stdev(dur_vals)
-
-                        threshold = 2 * self.stdev
-                        lower_bound = max(0, self.mean - threshold)
-                        upper_bound = self.mean + threshold
-
-                        new_anomalies = False
-                        for item in self.durations:
-                            d = item["duration"]
-                            idx = item["index"]
-                            if d < lower_bound or d > upper_bound:
-                                if idx not in [a["index"] for a in self.anomalies_list]:
-                                    self.anomalies_list.append(item)
-                                    new_anomalies = True
-
-                        if new_anomalies:
-                            self.app.call_from_thread(self.update_tree, self.anomalies_list.copy())
-
-                        stats_txt = (
-                            f"[b]Sample Size:[/] {len(self.durations)}\n"
-                            f"[b]Mean Duration:[/] {self.mean:.2f}s\n"
-                            f"[b]Std Dev (σ):[/] {self.stdev:.2f}s\n"
-                            f"[b]Bounds:[/] {lower_bound:.2f}s - {upper_bound:.2f}s\n\n"
-                            f"[b]Anomalies:[/] {len(self.anomalies_list)}"
-                        )
-                        self.app.call_from_thread(stats_panel.update, stats_txt)
-
-                pct = i / total_experiments * 100
+            # Periodic UI update
+            if (i + 1) % 50 == 0 or i == len(all_data) - 1:
+                pct = (i + 1) / len(all_data) * 100
                 self.app.call_from_thread(
                     status_w.update,
-                    f"  [bold]{i:,}[/] / [bold]{total_experiments:,}[/] fetched  │  [cyan]{pct:.1f}%[/]",
+                    f"  Parsing [bold]{i + 1:,}[/] / [bold]{len(all_data):,}[/]  │  [cyan]{pct:.1f}%[/]",
                 )
+                _time.sleep(0.01)
 
-                _time.sleep(0.005)
+        # 4. Compute statistics & find anomalies
+        if len(self.durations) < 2:
+            self.app.call_from_thread(
+                status_w.update,
+                f"[bold yellow]! Only {len(self.durations)} valid timing(s) found — not enough to detect anomalies.[/]",
+            )
+            return
 
-            except Exception as e:
-                # Silently skip on error to allow the loop to continue
-                pass
+        dur_vals = [d["duration"] for d in self.durations]
+        self.mean = statistics.mean(dur_vals)
+        self.stdev = statistics.stdev(dur_vals)
+
+        threshold = 2 * self.stdev
+        lower_bound = max(0, self.mean - threshold)
+        upper_bound = self.mean + threshold
+
+        for item in self.durations:
+            d = item["duration"]
+            if d < lower_bound or d > upper_bound:
+                self.anomalies_list.append(item)
+
+        # 5. Update UI with final results
+        stats_txt = (
+            f"[b]Sample Size:[/] {len(self.durations)}\n"
+            f"[b]Mean Duration:[/] {format_duration(self.mean)}\n"
+            f"[b]Std Dev (σ):[/] {format_duration(self.stdev)}\n"
+            f"[b]Bounds:[/] {format_duration(lower_bound)} - {format_duration(upper_bound)}\n\n"
+            f"[b]Anomalies:[/] {len(self.anomalies_list)}"
+        )
+        self.app.call_from_thread(stats_panel.update, stats_txt)
+        self.app.call_from_thread(self.update_tree, self.anomalies_list.copy())
 
         self.app.call_from_thread(
             status_w.update,
-            f"  [bold green]✓ Done![/]  │  [bold]{total_experiments:,}[/] total  │  "
+            f"  [bold green]✓ Done![/]  │  [bold]{len(all_data):,}[/] total  │  "
             f"[yellow]{len(self.durations)}[/] valid times  │  [red]{len(self.anomalies_list)}[/] anomalies found",
         )
 
