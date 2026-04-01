@@ -1,4 +1,6 @@
 function data = GetFromServer(ip, port, maxDelay)
+    % Ensure ea-suite directory is in the path
+    addpath(fullfile(pwd, '..', 'ea-suite'));
     url = sprintf('http://%s:%s', ip, port);
 
     computerName = getenv('COMPUTERNAME');
@@ -75,6 +77,7 @@ function fileName = runExperiment(data)
     elseif strcmp(data.algo, 'MISEGA_generational')
         algo.selection_methods  = {"tournament","rank","sus","truncation"};
         algo.partition_size     = data.m_val * op.dim;
+        algo.off_size           = algo.partition_size;
         algo.crossover          = struct;
         algo.crossover.p_c      = 0.9;
         algo.crossover.eta_c    = 20;
@@ -91,6 +94,7 @@ function fileName = runExperiment(data)
 
     elseif strcmp(data.algo, 'RGA_steady_state')
         algo.pop_size           = data.m_val * 4 * op.dim;
+        %algo.off_size           = algo.pop_size;
         algo.crossover          = struct;
         algo.crossover.p_c      = 0.9;
         algo.crossover.eta_c    = 20;
@@ -103,6 +107,7 @@ function fileName = runExperiment(data)
     elseif strcmp(data.algo, 'MISEGA_steady_state')
         algo.selection_methods  = {"tournament","rank","sus","truncation"};
         algo.partition_size     = data.m_val * op.dim;
+        %algo.off_size           = algo.partition_size;
         algo.crossover          = struct;
         algo.crossover.p_c      = 0.9;
         algo.crossover.eta_c    = 20;
