@@ -213,17 +213,19 @@ class CheckingScreen(Screen):
         fmt = "%Y-%m-%d %H:%M:%S"
         for i, data in enumerate(all_data):
             idx = data.get("index", i + 1)
-            if "Taken At" in data and "Completed At" in data:
-                try:
-                    start_time = datetime.strptime(data["Taken At"], fmt)
-                    end_time = datetime.strptime(data["Completed At"], fmt)
-                    duration = (end_time - start_time).total_seconds()
-                    if duration > 0:
-                        self.durations.append(
-                            {"index": idx, "duration": duration, "data": data}
-                        )
-                except Exception:
-                    pass
+            
+            if idx >= getattr(self.app, 'start_index', 0):
+                if "Taken At" in data and "Completed At" in data:
+                    try:
+                        start_time = datetime.strptime(data["Taken At"], fmt)
+                        end_time = datetime.strptime(data["Completed At"], fmt)
+                        duration = (end_time - start_time).total_seconds()
+                        if duration > 0:
+                            self.durations.append(
+                                {"index": idx, "duration": duration, "data": data}
+                            )
+                    except Exception:
+                        pass
 
             self.app.call_from_thread(pbar.advance, 1)
 
@@ -330,10 +332,11 @@ class AnomalyDetectorApp(App):
     }
     """
 
-    def __init__(self, host, port):
+    def __init__(self, host, port, start_index=0):
         super().__init__()
         self.host = host
         self.port = port
+        self.start_index = start_index
 
     def on_mount(self) -> None:
         self.push_screen(CheckingScreen())
@@ -343,9 +346,10 @@ def main():
     parser = argparse.ArgumentParser(description="Anomaly Detector TUI")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Server host")
     parser.add_argument("--port", type=int, default=3753, help="Server port")
+    parser.add_argument("--start-index", type=int, default=0, help="Minimum index to consider for anomalies")
     args = parser.parse_args()
 
-    app = AnomalyDetectorApp(args.host, args.port)
+    app = AnomalyDetectorApp(args.host, args.port, args.start_index)
     app.run()
 
 
