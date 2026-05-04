@@ -82,9 +82,10 @@ class CheckingScreen(Screen):
         self.run_check()
 
     @on(Tree.NodeSelected)
-    def on_node_selected(self, event: Tree.NodeSelected) -> None:
+    @on(Tree.NodeHighlighted)
+    def on_node_interaction(self, event) -> None:
         data_panel = self.query_one("#data-panel", Static)
-        node_data = event.node.data
+        node_data = getattr(event.node, "data", None)
         if node_data:
             d = node_data.get("data", {})
             duration = node_data.get("duration", 0)
@@ -105,32 +106,48 @@ class CheckingScreen(Screen):
         else:
             data_panel.update("Select a specific experiment below a group to view its data.")
 
-    def group_anomalies(self, anomalies):
-        freq = {}
+    def group_anomalies(self, anomalies, normal_runs):
+        anom_freq = {}
+        norm_freq = {}
+        
         for a in anomalies:
-            data = a["data"]
-            for k, v in data.items():
+            for k, v in a["data"].items():
                 if k in ("id", "Taken At", "Completed At", "index"):
                     continue
                 pair = (k, str(v))
-                freq[pair] = freq.get(pair, 0) + 1
+                anom_freq[pair] = anom_freq.get(pair, 0) + 1
+                
+        for n in normal_runs:
+            for k, v in n["data"].items():
+                if k in ("id", "Taken At", "Completed At", "index"):
+                    continue
+                pair = (k, str(v))
+                norm_freq[pair] = norm_freq.get(pair, 0) + 1
 
         groups = {}
         for a in anomalies:
-            data = a["data"]
             best_pair = None
-            best_count = 1
+            best_score = -1
 
-            for k, v in data.items():
+            for k, v in a["data"].items():
                 if k in ("id", "Taken At", "Completed At", "index"):
                     continue
                 pair = (k, str(v))
-                if freq[pair] > best_count:
-                    best_count = freq[pair]
+                a_count = anom_freq[pair]
+                n_count = norm_freq.get(pair, 0)
+                
+                # Exclusivity ratio: 1.0 means it ONLY happens in anomalies
+                ratio = a_count / (a_count + n_count) if (a_count + n_count) > 0 else 0
+                
+                # Heavily weight high exclusivity, break ties with higher occurrence count
+                score = (ratio * 10000) + a_count
+
+                if score > best_score:
+                    best_score = score
                     best_pair = pair
 
             if best_pair:
-                group_name = f"{best_pair[0]} = {best_pair[1]}"
+                group_name = f"{best_pair[0]} = {best_pair[1]} (Anomalous: {anom_freq[best_pair]}, Normal: {norm_freq.get(best_pair, 0)})"
             else:
                 group_name = "Unique / Uncategorized"
 
@@ -140,14 +157,14 @@ class CheckingScreen(Screen):
 
         return dict(sorted(groups.items(), key=lambda item: len(item[1]), reverse=True))
 
-    def update_tree(self, anomalies):
+    def update_tree(self, anomalies, normal_runs):
         tree = self.query_one("#anomaly-tree", Tree)
         tree.clear()
 
-        groups = self.group_anomalies(anomalies)
+        groups = self.group_anomalies(anomalies, normal_runs)
 
         for group_name, group_items in groups.items():
-            group_node = tree.root.add(f"[b]{group_name}[/] ({len(group_items)})", expand=True)
+            group_node = tree.root.add(f"[b]{group_name}[/]", expand=True)
             for item in group_items:
                 idx = item["index"]
                 d = item["duration"]
@@ -211,6 +228,10 @@ class CheckingScreen(Screen):
 
         # 3. Parse durations
         fmt = "%Y-%m-%d %H:%M:%S"
+        
+        batch_size = max(500, len(all_data) // 50)
+        advanced = 0
+        
         for i, data in enumerate(all_data):
             idx = data.get("index", i + 1)
             
@@ -227,16 +248,15 @@ class CheckingScreen(Screen):
                     except Exception:
                         pass
 
-            self.app.call_from_thread(pbar.advance, 1)
-
-            # Periodic UI update
-            if (i + 1) % 50 == 0 or i == len(all_data) - 1:
+            advanced += 1
+            if advanced >= batch_size or i == len(all_data) - 1:
+                self.app.call_from_thread(pbar.advance, advanced)
                 pct = (i + 1) / len(all_data) * 100
                 self.app.call_from_thread(
                     status_w.update,
                     f"  Parsing [bold]{i + 1:,}[/] / [bold]{len(all_data):,}[/]  │  [cyan]{pct:.1f}%[/]",
                 )
-                _time.sleep(0.01)
+                advanced = 0
 
         # 4. Compute statistics & find anomalies
         if len(self.durations) < 2:
@@ -248,27 +268,36 @@ class CheckingScreen(Screen):
 
         dur_vals = [d["duration"] for d in self.durations]
         self.mean = statistics.mean(dur_vals)
+        self.median = statistics.median(dur_vals)
         self.stdev = statistics.stdev(dur_vals)
+        self.shortest = min(dur_vals)
+        self.longest = max(dur_vals)
 
         threshold = 2 * self.stdev
         lower_bound = max(0, self.mean - threshold)
         upper_bound = self.mean + threshold
 
+        normal_runs = []
         for item in self.durations:
             d = item["duration"]
             if d < lower_bound or d > upper_bound:
                 self.anomalies_list.append(item)
+            else:
+                normal_runs.append(item)
 
         # 5. Update UI with final results
         stats_txt = (
             f"[b]Sample Size:[/] {len(self.durations)}\n"
+            f"[b]Shortest Run:[/] {format_duration(self.shortest)}\n"
+            f"[b]Longest Run:[/] {format_duration(self.longest)}\n"
             f"[b]Mean Duration:[/] {format_duration(self.mean)}\n"
+            f"[b]Median Duration:[/] {format_duration(self.median)}\n"
             f"[b]Std Dev (σ):[/] {format_duration(self.stdev)}\n"
             f"[b]Bounds:[/] {format_duration(lower_bound)} - {format_duration(upper_bound)}\n\n"
             f"[b]Anomalies:[/] {len(self.anomalies_list)}"
         )
         self.app.call_from_thread(stats_panel.update, stats_txt)
-        self.app.call_from_thread(self.update_tree, self.anomalies_list.copy())
+        self.app.call_from_thread(self.update_tree, self.anomalies_list.copy(), normal_runs)
 
         self.app.call_from_thread(
             status_w.update,
