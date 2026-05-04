@@ -112,7 +112,14 @@ class CheckingScreen(Screen):
     def on_node_interaction(self, event) -> None:
         data_panel = self.query_one("#data-panel", Static)
         node_data = getattr(event.node, "data", None)
-        if node_data:
+        
+        if not node_data:
+            data_panel.update("Select a parameter, value, or experiment to view details.")
+            return
+
+        n_type = node_data.get("type")
+        
+        if n_type == "experiment":
             d = node_data.get("data", {})
             duration = node_data.get("duration", 0)
             idx = node_data.get("index", "?")
@@ -131,8 +138,64 @@ class CheckingScreen(Screen):
                 lines.append(" [green](Sourced from historical state file)[/]")
 
             data_panel.update("\n".join(lines))
+            
+        elif n_type == "value":
+            key = node_data.get("key")
+            val = node_data.get("value")
+            stats = node_data.get("stats", {})
+            anom_c = len(stats.get("anomalous", []))
+            norm_c = stats.get("normal_count", 0)
+            total = anom_c + norm_c
+            pct = (anom_c / total * 100) if total > 0 else 0
+            
+            lines = [
+                f"[b]Parameter:[/] {key}",
+                f"[b]Value:[/] {val}",
+                "",
+                f"[b]Anomalous Runs:[/] {anom_c}",
+                f"[b]Normal Runs:[/] {norm_c}",
+                f"[b]Total Runs:[/] {total}",
+                f"[b]Anomaly Rate:[/] {pct:.1f}%"
+            ]
+            data_panel.update("\n".join(lines))
+            
+        elif n_type == "parameter":
+            key = node_data.get("key")
+            values_dict = node_data.get("values", {})
+            
+            lines = [f"[b]Parameter:[/] {key}", ""]
+            lines.append("[b]Anomalous vs Normal Distribution[/b]")
+            lines.append("────────────────────────────────────────")
+            
+            max_total = max((len(s["anomalous"]) + s["normal_count"]) for s in values_dict.values()) if values_dict else 1
+            sorted_vals = sorted(values_dict.items(), key=lambda x: (len(x[1]["anomalous"]), x[1]["normal_count"]), reverse=True)
+            
+            for val_str, stats in sorted_vals:
+                anom_c = len(stats["anomalous"])
+                norm_c = stats["normal_count"]
+                total = anom_c + norm_c
+                if total == 0: continue
+                
+                bar_width = 40
+                anom_len = int((anom_c / max_total) * bar_width)
+                norm_len = int((norm_c / max_total) * bar_width)
+                
+                if anom_c > 0 and anom_len == 0: anom_len = 1
+                if norm_c > 0 and norm_len == 0: norm_len = 1
+                
+                anom_bar = "█" * anom_len
+                norm_bar = "▒" * norm_len
+                
+                pct = (anom_c / total * 100)
+                
+                lines.append(f"[cyan]{val_str}[/] (Total: {total}, Anom: {pct:.1f}%)")
+                lines.append(f"[red]{anom_bar}[/][green]{norm_bar}[/]")
+                lines.append("")
+            
+            lines.append("[dim]Legend: [red]█ Anomalous[/red]  [green]▒ Normal[/green][/dim]")
+            data_panel.update("\n".join(lines))
         else:
-            data_panel.update("Select a specific experiment below a group to view its data.")
+            data_panel.update("Unknown node type.")
 
     def update_state_details_panel(self, idx: int) -> None:
         details_panel = self.query_one("#state-details", Static)
@@ -221,72 +284,71 @@ class CheckingScreen(Screen):
         # Re-process
         self.process_data()
 
-    def group_anomalies(self, anomalies, normal_runs):
-        anom_freq = {}
-        norm_freq = {}
+    def build_parameter_hierarchy(self, anomalies, normal_runs):
+        hierarchy = {}
         
-        for a in anomalies:
-            for k, v in a["data"].items():
-                if k in ("id", "Taken At", "Completed At", "index"):
-                    continue
-                pair = (k, str(v))
-                anom_freq[pair] = anom_freq.get(pair, 0) + 1
-                
         for n in normal_runs:
             for k, v in n["data"].items():
-                if k in ("id", "Taken At", "Completed At", "index"):
+                if k in ("id", "Taken At", "Completed At", "index", "historical_merge"):
                     continue
-                pair = (k, str(v))
-                norm_freq[pair] = norm_freq.get(pair, 0) + 1
+                v_str = str(v)
+                if k not in hierarchy:
+                    hierarchy[k] = {}
+                if v_str not in hierarchy[k]:
+                    hierarchy[k][v_str] = {"anomalous": [], "normal_count": 0}
+                hierarchy[k][v_str]["normal_count"] += 1
 
-        groups = {}
         for a in anomalies:
-            best_pair = None
-            best_score = -1
-
             for k, v in a["data"].items():
-                if k in ("id", "Taken At", "Completed At", "index"):
+                if k in ("id", "Taken At", "Completed At", "index", "historical_merge"):
                     continue
-                pair = (k, str(v))
-                a_count = anom_freq[pair]
-                n_count = norm_freq.get(pair, 0)
-                
-                # Exclusivity ratio: 1.0 means it ONLY happens in anomalies
-                ratio = a_count / (a_count + n_count) if (a_count + n_count) > 0 else 0
-                
-                # Heavily weight high exclusivity, break ties with higher occurrence count
-                score = (ratio * 10000) + a_count
+                v_str = str(v)
+                if k not in hierarchy:
+                    hierarchy[k] = {}
+                if v_str not in hierarchy[k]:
+                    hierarchy[k][v_str] = {"anomalous": [], "normal_count": 0}
+                hierarchy[k][v_str]["anomalous"].append(a)
 
-                if score > best_score:
-                    best_score = score
-                    best_pair = pair
-
-            if best_pair:
-                group_name = f"{best_pair[0]} = {best_pair[1]} (Anomalous: {anom_freq[best_pair]}, Normal: {norm_freq.get(best_pair, 0)})"
-            else:
-                group_name = "Unique / Uncategorized"
-
-            if group_name not in groups:
-                groups[group_name] = []
-            groups[group_name].append(a)
-
-        return dict(sorted(groups.items(), key=lambda item: len(item[1]), reverse=True))
+        return hierarchy
 
     def update_tree(self, anomalies, normal_runs):
         tree = self.query_one("#anomaly-tree", Tree)
         tree.clear()
 
-        groups = self.group_anomalies(anomalies, normal_runs)
+        hierarchy = self.build_parameter_hierarchy(anomalies, normal_runs)
 
-        for group_name, group_items in groups.items():
-            group_node = tree.root.add(f"[b]{group_name}[/]", expand=True)
-            for item in group_items:
-                idx = item["index"]
-                d = item["duration"]
+        for param_key, values_dict in hierarchy.items():
+            total_anom_for_param = sum(len(v["anomalous"]) for v in values_dict.values())
+            if total_anom_for_param == 0:
+                continue
 
-                status = "[red]Too Long[/red]" if d > self.mean else "[blue]Too Short[/blue]"
-                label = f"Exp {idx}: {format_duration(d)} {status}"
-                group_node.add_leaf(label, data=item)
+            param_node = tree.root.add(f"[b]Param:[/] {param_key}", data={"type": "parameter", "key": param_key, "values": values_dict})
+            
+            for val_str, stats in values_dict.items():
+                anom_list = stats["anomalous"]
+                norm_c = stats["normal_count"]
+                anom_c = len(anom_list)
+                
+                if anom_c == 0:
+                    continue
+
+                val_node = param_node.add(f"[cyan]{val_str}[/] (Anom: {anom_c}, Norm: {norm_c})", 
+                                          data={"type": "value", "key": param_key, "value": val_str, "stats": stats})
+                
+                for item in anom_list:
+                    idx = item["index"]
+                    d = item["duration"]
+                    status = "[red]Too Long[/red]" if d > self.mean else "[blue]Too Short[/blue]"
+                    label = f"Exp {idx}: {format_duration(d)} {status}"
+                    
+                    exp_data = {
+                        "type": "experiment", 
+                        "data": item["data"], 
+                        "duration": item["duration"], 
+                        "index": item["index"], 
+                        "historical_merge": item.get("historical_merge")
+                    }
+                    val_node.add_leaf(label, data=exp_data)
 
     @work(exclusive=True, thread=True)
     def run_check(self) -> None:
