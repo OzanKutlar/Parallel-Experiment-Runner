@@ -1,21 +1,53 @@
 PS C:\Users\Ozan\Parallel-Experiment-Runner\utility> py .\anomaly_detector.py --start-index 52920
 ╭────────────────────────────────────────────────────────────────────────────────────── Traceback (most recent call last) ──────────────────────────────────────────────────────────────────────────────────────╮
-│ C:\Users\Ozan\Parallel-Experiment-Runner\utility\anomaly_detector.py:202 in on_merge_pressed                                                                                                                  │
+│ C:\Users\Ozan\Parallel-Experiment-Runner\utility\anomaly_detector.py:217 in on_merge_pressed                                                                                                                  │
 │                                                                                                                                                                                                               │
-│   199 │   │   state["is_merged"] = True                                                                                                                                                                       │
-│   200 │   │                                                                                                                                                                                                   │
-│   201 │   │   # Update Option List visual                                                                                                                                                                     │
-│ ❱ 202 │   │   state_list.replace_option_at(idx, Option(f"[green]★[/] {state['filename']} ({mer                                                                                                                │
-│   203 │   │                                                                                                                                                                                                   │
-│   204 │   │   # Re-trigger interaction to update details & disable button                                                                                                                                     │
-│   205 │   │   self.on_state_interaction(OptionList.OptionHighlighted(state_list, idx))                                                                                                                        │
+│   214 │   │   state_list.highlighted = idx                                                                                                                                                                    │
+│   215 │   │                                                                                                                                                                                                   │
+│   216 │   │   # Re-trigger interaction to update details & disable button                                                                                                                                     │
+│ ❱ 217 │   │   self.on_state_interaction(OptionList.OptionHighlighted(state_list, idx))                                                                                                                        │
+│   218 │   │                                                                                                                                                                                                   │
+│   219 │   │   # Re-process                                                                                                                                                                                    │
+│   220 │   │   self.process_data()                                                                                                                                                                             │
 │                                                                                                                                                                                                               │
 │ ╭──────────────────────────────────────────────────────── locals ────────────────────────────────────────────────────────╮                                                                                    │
 │ │        event = Pressed()                                                                                               │                                                                                    │
-│ │            i = 63493                                                                                                   │                                                                                    │
+│ │            i = 2                                                                                                       │                                                                                    │
 │ │          idx = 0                                                                                                       │                                                                                    │
 │ │      idx_str = '63493'                                                                                                 │                                                                                    │
+│ │        label = '[dim]○[/] state_20260405_085017.json'                                                                  │                                                                                    │
+│ │       marker = '[dim]○[/]'                                                                                             │                                                                                    │
 │ │ merged_count = 0                                                                                                       │                                                                                    │
+│ │      options = [                                                                                                       │                                                                                    │
+│ │                │   Option('[green]★[/] state_20260428_194058.json (0 merged)', id='state-0'),                          │                                                                                    │
+│ │                │   Option('[dim]○[/] state_20260409_143223.json', id='state-1'),                                       │                                                                                    │
+│ │                │   Option('[dim]○[/] state_20260405_085017.json', id='state-2')                                        │                                                                                    │
+│ │                ]                                                                                                       │                                                                                    │
+│ │            s = {                                                                                                       │                                                                                    │
+│ │                │   'path': 'C:\\Users\\Ozan\\Parallel-Experiment-Runner\\server\\states\\state_20260405_085017.jso'+1, │                                                                                    │
+│ │                │   'filename': 'state_20260405_085017.json',                                                           │                                                                                    │
+│ │                │   'param_file': 'parameters_misega.py',                                                               │                                                                                    │
+│ │                │   'total_items': 7879,                                                                                │                                                                                    │
+│ │                │   'completed_count': 7869,                                                                            │                                                                                    │
+│ │                │   'max_completed_index': 7871,                                                                        │                                                                                    │
+│ │                │   'timing_entries': 7879,                                                                             │                                                                                    │
+│ │                │   'raw_timing': {                                                                                     │                                                                                    │
+│ │                │   │   '0': {'Taken At': '2026-04-05 08:50:45', 'Completed At': '2026-04-05 08:50:46'},                │                                                                                    │
+│ │                │   │   '1': {'Taken At': '2026-04-05 08:50:45', 'Completed At': '2026-04-05 08:50:46'},                │                                                                                    │
+│ │                │   │   '2': {'Taken At': '2026-04-05 08:50:45', 'Completed At': '2026-04-05 08:50:46'},                │                                                                                    │
+│ │                │   │   '3': {'Taken At': '2026-04-05 08:50:48', 'Completed At': '2026-04-05 08:50:50'},                │                                                                                    │
+│ │                │   │   '4': {'Taken At': '2026-04-05 08:50:48', 'Completed At': '2026-04-05 08:50:50'},                │                                                                                    │
+│ │                │   │   '5': {'Taken At': '2026-04-05 08:50:48', 'Completed At': '2026-04-05 08:50:50'},                │                                                                                    │
+│ │                │   │   '6': {'Taken At': '2026-04-05 08:50:52', 'Completed At': '2026-04-05 08:50:56'},                │                                                                                    │
+│ │                │   │   '7': {'Taken At': '2026-04-05 08:50:52', 'Completed At': '2026-04-05 08:50:56'},                │                                                                                    │
+│ │                │   │   '8': {'Taken At': '2026-04-05 08:50:52', 'Completed At': '2026-04-05 08:50:56'},                │                                                                                    │
+│ │                │   │   '9': {'Taken At': '2026-04-05 08:50:58', 'Completed At': '2026-04-05 08:51:08'},                │                                                                                    │
+│ │                │   │   ... +7869                                                                                       │                                                                                    │
+│ │                │   },                                                                                                  │                                                                                    │
+│ │                │   'slots_in': False,                                                                                  │                                                                                    │
+│ │                │   'matches_total': False,                                                                             │                                                                                    │
+│ │                │   ... +2                                                                                              │                                                                                    │
+│ │                }                                                                                                       │                                                                                    │
 │ │         self = CheckingScreen()                                                                                        │                                                                                    │
 │ │        state = {                                                                                                       │                                                                                    │
 │ │                │   'path': 'C:\\Users\\Ozan\\Parallel-Experiment-Runner\\server\\states\\state_20260428_194058.jso'+1, │                                                                                    │
@@ -46,5 +78,5 @@ PS C:\Users\Ozan\Parallel-Experiment-Runner\utility> py .\anomaly_detector.py --
 │ │       t_info = {'Taken At': '2026-04-28 19:41:10', 'Completed At': '2026-04-29 04:03:53'}                              │                                                                                    │
 │ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯                                                                                    │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-AttributeError: 'OptionList' object has no attribute 'replace_option_at'
+TypeError: OptionList.OptionMessage.__init__() missing 1 required positional argument: 'index'
 PS C:\Users\Ozan\Parallel-Experiment-Runner\utility>

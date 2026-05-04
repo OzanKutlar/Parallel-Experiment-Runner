@@ -134,11 +134,8 @@ class CheckingScreen(Screen):
         else:
             data_panel.update("Select a specific experiment below a group to view its data.")
 
-    @on(OptionList.OptionSelected)
-    @on(OptionList.OptionHighlighted)
-    def on_state_interaction(self, event) -> None:
+    def update_state_details_panel(self, idx: int) -> None:
         details_panel = self.query_one("#state-details", Static)
-        idx = event.option_index
         if 0 <= idx < len(self.states_data):
             state = self.states_data[idx]
             
@@ -170,6 +167,11 @@ class CheckingScreen(Screen):
             btn = self.query_one("#btn-merge", Button)
             btn.display = True
             btn.disabled = state.get('is_merged', False) or state['timing_entries'] == 0
+
+    @on(OptionList.OptionSelected)
+    @on(OptionList.OptionHighlighted)
+    def on_state_interaction(self, event) -> None:
+        self.update_state_details_panel(event.option_index)
 
     @on(Button.Pressed, "#btn-merge")
     def on_merge_pressed(self, event: Button.Pressed) -> None:
@@ -213,8 +215,8 @@ class CheckingScreen(Screen):
         state_list.add_options(options)
         state_list.highlighted = idx
         
-        # Re-trigger interaction to update details & disable button
-        self.on_state_interaction(OptionList.OptionHighlighted(state_list, idx))
+        # Update details & disable button
+        self.update_state_details_panel(idx)
         
         # Re-process
         self.process_data()
