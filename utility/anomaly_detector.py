@@ -198,8 +198,20 @@ class CheckingScreen(Screen):
         state["merged_count"] = merged_count
         state["is_merged"] = True
         
-        # Update Option List visual
-        state_list.replace_option_at(idx, Option(f"[green]★[/] {state['filename']} ({merged_count} merged)", id=f"state-{idx}"))
+        # Update Option List visual by rebuilding it
+        options = []
+        for i, s in enumerate(self.states_data):
+            if s.get("is_merged"):
+                marker = "[green]★[/]"
+                label = f"{marker} {s['filename']} ({s['merged_count']} merged)"
+            else:
+                marker = "[dim]○[/]"
+                label = f"{marker} {s['filename']}"
+            options.append(Option(label, id=f"state-{i}"))
+            
+        state_list.clear_options()
+        state_list.add_options(options)
+        state_list.highlighted = idx
         
         # Re-trigger interaction to update details & disable button
         self.on_state_interaction(OptionList.OptionHighlighted(state_list, idx))
