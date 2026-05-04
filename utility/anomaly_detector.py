@@ -6,14 +6,17 @@ times of the experiments. It calculates the mean and standard deviation of
 the durations and highlights statistical outliers (too fast or too slow).
 It also groups the anomalies by their most common data parameters.
 
-Uses the /batchInfo endpoint to fetch all experiment data in one request.
+Now includes a Historical States tab to merge missing timestamps from
+previous server sessions.
 
 Usage:
-    python anomaly_detector.py [--host 127.0.0.1] [--port 3753]
+    python anomaly_detector.py [--host 127.0.0.1] [--port 3753] [--states-dir ../server/states]
 """
 
 import argparse
+import glob
 import json
+import os
 import statistics
 import time as _time
 import urllib.error
@@ -31,7 +34,11 @@ from textual.widgets import (
     ProgressBar,
     Static,
     Tree,
+    TabbedContent,
+    TabPane,
+    OptionList
 )
+from textual.widgets.option_list import Option
 
 
 def format_duration(seconds: float) -> str:
@@ -48,7 +55,7 @@ def format_duration(seconds: float) -> str:
     if m > 0:
         parts.append(f"{m}m")
     parts.append(f"{s}s")
-    return " ".join(parts)
+    return " ".join(parts) if parts else "0s"
 
 
 class CheckingScreen(Screen):
@@ -58,17 +65,29 @@ class CheckingScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        with Horizontal(id="main"):
-            with Vertical(id="left"):
-                yield Static("[b]⚠️ Anomalies Found[/b]", id="left-hdr")
-                tree = Tree("Anomalies", id="anomaly-tree")
-                tree.root.expand()
-                yield tree
-            with Vertical(id="right"):
-                yield Static("[b]📊 Statistics[/b]", id="right-hdr")
-                yield Static("Initializing...", id="stats-panel")
-                yield Static("[b]🔍 Data Details[/b]", id="details-hdr")
-                yield Static("Click an anomaly in the tree to see its parameters.", id="data-panel")
+        with TabbedContent(initial="tab-anomalies"):
+            with TabPane("🔍 Anomaly Analysis", id="tab-anomalies"):
+                with Horizontal(id="main"):
+                    with Vertical(id="left"):
+                        yield Static("[b]⚠️ Anomalies Found[/b]", id="left-hdr")
+                        tree = Tree("Anomalies", id="anomaly-tree")
+                        tree.root.expand()
+                        yield tree
+                    with Vertical(id="right"):
+                        yield Static("[b]📊 Statistics[/b]", id="right-hdr")
+                        yield Static("Initializing...", id="stats-panel")
+                        yield Static("[b]🔍 Data Details[/b]", id="details-hdr")
+                        yield Static("Click or use arrows to select an anomaly.", id="data-panel")
+            
+            with TabPane("💾 Historical States", id="tab-states"):
+                with Horizontal(id="state-main"):
+                    with Vertical(id="state-left"):
+                        yield Static("[b]State Files[/b]", id="state-left-hdr")
+                        yield OptionList(id="state-list")
+                    with Vertical(id="state-right"):
+                        yield Static("[b]State Details[/b]", id="state-right-hdr")
+                        yield Static("Scanning for historical state files...", id="state-details")
+
         with Vertical(id="bottom"):
             yield ProgressBar(id="pbar", total=100, show_eta=True)
             yield Static("Checking server connection...", id="status")
@@ -77,8 +96,12 @@ class CheckingScreen(Screen):
     def on_mount(self) -> None:
         self.anomalies_list = []
         self.durations = []
+        self.states_data = []
         self.mean = 0
+        self.median = 0
         self.stdev = 0
+        self.shortest = 0
+        self.longest = 0
         self.run_check()
 
     @on(Tree.NodeSelected)
@@ -101,10 +124,43 @@ class CheckingScreen(Screen):
                 lines.append(f" Taken At: {d['Taken At']}")
             if "Completed At" in d:
                 lines.append(f" Completed At: {d['Completed At']}")
+            if node_data.get("historical_merge"):
+                lines.append(" [green](Sourced from historical state file)[/]")
 
             data_panel.update("\n".join(lines))
         else:
             data_panel.update("Select a specific experiment below a group to view its data.")
+
+    @on(OptionList.OptionSelected)
+    @on(OptionList.OptionHighlighted)
+    def on_state_interaction(self, event) -> None:
+        details_panel = self.query_one("#state-details", Static)
+        idx = event.option_index
+        if 0 <= idx < len(self.states_data):
+            state = self.states_data[idx]
+            
+            slot_txt = "[green]Yes[/green]" if state['slots_in'] else "[red]No[/red]"
+            match_txt = "[green]Yes[/green]" if state['matches_total'] else "[red]No[/red]"
+            
+            lines = [
+                f"[b]File:[/] {state['filename']}",
+                f"[b]Path:[/] [dim]{state['path']}[/]\n",
+                f"[b]Parameter File:[/] [cyan]{state['param_file']}[/]",
+                f"[b]Total Items:[/] {state['total_items']}",
+                f"[b]Completed Items:[/] {state['completed_count']}",
+                f"[b]Stopped at ID:[/] {state['max_completed_index'] + 1} (0-indexed: {state['max_completed_index']})",
+                f"[b]Timing Entries Available:[/] {state['timing_entries']}\n",
+                f"[b]Slots In (Matches Live PRE count)?[/] {slot_txt}",
+                f"[b]Matches Total Live Experiments?[/] {match_txt}\n",
+                f"[b]Timings Merged into Live Analysis:[/] [bold yellow]{state['merged_count']}[/]"
+            ]
+            
+            if state['slots_in']:
+                lines.append("\n[dim]This state perfectly aligns with where the live server resumed processing.[/]")
+            elif state['matches_total']:
+                lines.append("\n[dim]This state matches the parameter space size of the live server.[/]")
+                
+            details_panel.update("\n".join(lines))
 
     def group_anomalies(self, anomalies, normal_runs):
         anom_freq = {}
@@ -202,13 +258,24 @@ class CheckingScreen(Screen):
                 status_w.update, "[bold yellow]! Connected, but 0 experiments found.[/]"
             )
             return
+            
+        # 2. Get Live PRE count by querying /status history
+        live_pre_count = 0
+        try:
+            req = urllib.request.Request(f"{base_url}/status", headers={"lastLog": "-1"})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                logs = json.loads(response.read().decode())
+                # Count how many logs were sent to PRE (indicating they were loaded from disk on startup)
+                live_pre_count = sum(1 for log in logs if log.get("sentTo") == "PRE")
+        except Exception:
+            pass
 
         self.app.call_from_thread(
             status_w.update,
             f"  [green]✓ Connected[/]  •  [bold]{total_experiments:,}[/] experiments  •  Fetching batch data…",
         )
 
-        # 2. Fetch all data in one batch request
+        # 3. Fetch all data in one batch request
         try:
             req = urllib.request.Request(f"{base_url}/batchInfo")
             with urllib.request.urlopen(req, timeout=30) as response:
@@ -219,16 +286,85 @@ class CheckingScreen(Screen):
                 f"[bold red]✗ Failed to fetch batch data: {e}[/]",
             )
             return
+            
+        # 4. Load and process historical states to merge missing timestamps
+        self.app.call_from_thread(status_w.update, "  Parsing Historical States...")
+        states_dir = self.app.states_dir
+        state_files = sorted(glob.glob(os.path.join(states_dir, "state_*.json")), reverse=True)
+        
+        state_options = []
+        
+        for fpath in state_files:
+            try:
+                with open(fpath, 'r') as f:
+                    s_data = json.load(f)
+                
+                comp_arr = s_data.get("completed_array", [])
+                total_items = len(comp_arr)
+                completed_count = sum(1 for c in comp_arr if c)
+                
+                max_completed = -1
+                for i in range(len(comp_arr)-1, -1, -1):
+                    if comp_arr[i]:
+                        max_completed = i
+                        break
+                        
+                timing_info = s_data.get("timing_info", {})
+                
+                state_dict = {
+                    "path": fpath,
+                    "filename": os.path.basename(fpath),
+                    "param_file": s_data.get("data_file", "Unknown"),
+                    "total_items": total_items,
+                    "completed_count": completed_count,
+                    "max_completed_index": max_completed,
+                    "timing_entries": len(timing_info),
+                    "raw_timing": timing_info
+                }
+                
+                # Evaluate match / slot in
+                slots_in = (max_completed == live_pre_count - 1 and live_pre_count > 0)
+                matches_total = (total_items == total_experiments)
+                
+                state_dict["slots_in"] = slots_in
+                state_dict["matches_total"] = matches_total
+                
+                # Merge logic
+                merged_count = 0
+                if matches_total or slots_in:
+                    for idx_str, t_info in timing_info.items():
+                        try:
+                            idx = int(idx_str)
+                            if 0 <= idx < len(all_data):
+                                if "Completed At" not in all_data[idx] and "Completed At" in t_info:
+                                    all_data[idx]["Taken At"] = t_info.get("Taken At")
+                                    all_data[idx]["Completed At"] = t_info.get("Completed At")
+                                    all_data[idx]["historical_merge"] = True
+                                    merged_count += 1
+                        except ValueError:
+                            continue
+                
+                state_dict["merged_count"] = merged_count
+                self.states_data.append(state_dict)
+                
+                marker = "[green]★[/]" if merged_count > 0 else "[dim]○[/]"
+                state_options.append(Option(f"{marker} {state_dict['filename']} ({merged_count} merged)"))
+                
+            except Exception:
+                continue
+                
+        if state_options:
+            state_list = self.query_one("#state-list", OptionList)
+            self.app.call_from_thread(state_list.add_options, state_options)
 
+        # 5. Parse durations
         self.app.call_from_thread(setattr, pbar, "total", len(all_data))
         self.app.call_from_thread(
             status_w.update,
-            f"  [green]✓ Received[/]  •  [bold]{len(all_data):,}[/] experiments  •  Analyzing…",
+            f"  [green]✓ Data Ready[/]  •  [bold]{len(all_data):,}[/] experiments  •  Analyzing durations…",
         )
 
-        # 3. Parse durations
         fmt = "%Y-%m-%d %H:%M:%S"
-        
         batch_size = max(500, len(all_data) // 50)
         advanced = 0
         
@@ -243,7 +379,12 @@ class CheckingScreen(Screen):
                         duration = (end_time - start_time).total_seconds()
                         if duration > 0:
                             self.durations.append(
-                                {"index": idx, "duration": duration, "data": data}
+                                {
+                                    "index": idx,
+                                    "duration": duration,
+                                    "data": data,
+                                    "historical_merge": data.get("historical_merge", False)
+                                }
                             )
                     except Exception:
                         pass
@@ -258,7 +399,7 @@ class CheckingScreen(Screen):
                 )
                 advanced = 0
 
-        # 4. Compute statistics & find anomalies
+        # 6. Compute statistics & find anomalies
         if len(self.durations) < 2:
             self.app.call_from_thread(
                 status_w.update,
@@ -285,7 +426,7 @@ class CheckingScreen(Screen):
             else:
                 normal_runs.append(item)
 
-        # 5. Update UI with final results
+        # 7. Update UI with final results
         stats_txt = (
             f"[b]Sample Size:[/] {len(self.durations)}\n"
             f"[b]Shortest Run:[/] {format_duration(self.shortest)}\n"
@@ -302,7 +443,7 @@ class CheckingScreen(Screen):
         self.app.call_from_thread(
             status_w.update,
             f"  [bold green]✓ Done![/]  │  [bold]{len(all_data):,}[/] total  │  "
-            f"[yellow]{len(self.durations)}[/] valid times  │  [red]{len(self.anomalies_list)}[/] anomalies found",
+            f"[yellow]{len(self.durations)}[/] valid times  │  [red]{len(self.anomalies_list)}[/] anomalies found"
         )
 
 
@@ -313,14 +454,15 @@ class AnomalyDetectorApp(App):
         background: $surface;
     }
 
-    #main {
+    #main, #state-main {
         height: 1fr;
     }
-    #left {
+    #left, #state-left {
         width: 1fr;
         min-width: 30;
+        border-right: thick $accent 30%;
     }
-    #left-hdr, #right-hdr, #details-hdr {
+    #left-hdr, #right-hdr, #details-hdr, #state-left-hdr, #state-right-hdr {
         height: 1;
         padding: 0 1;
         background: $accent 15%;
@@ -328,19 +470,22 @@ class AnomalyDetectorApp(App):
     }
     #anomaly-tree {
         height: 1fr;
-        border-right: thick $accent 30%;
         padding: 0 1;
         scrollbar-size: 1 1;
     }
-    #right {
-        width: 45;
+    #state-list {
+        height: 1fr;
+        padding: 0 1;
+    }
+    #right, #state-right {
+        width: 2fr;
     }
     #stats-panel {
         height: auto;
         min-height: 8;
         padding: 1 2;
     }
-    #data-panel {
+    #data-panel, #state-details {
         height: 1fr;
         padding: 1 2;
         overflow-y: auto;
@@ -361,11 +506,12 @@ class AnomalyDetectorApp(App):
     }
     """
 
-    def __init__(self, host, port, start_index=0):
+    def __init__(self, host, port, start_index, states_dir):
         super().__init__()
         self.host = host
         self.port = port
         self.start_index = start_index
+        self.states_dir = states_dir
 
     def on_mount(self) -> None:
         self.push_screen(CheckingScreen())
@@ -376,9 +522,15 @@ def main():
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Server host")
     parser.add_argument("--port", type=int, default=3753, help="Server port")
     parser.add_argument("--start-index", type=int, default=0, help="Minimum index to consider for anomalies")
+    
+    # Default to ../server/states relative to this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    default_states = os.path.normpath(os.path.join(script_dir, "..", "server", "states"))
+    parser.add_argument("--states-dir", type=str, default=default_states, help="Path to the historical states directory")
+    
     args = parser.parse_args()
 
-    app = AnomalyDetectorApp(args.host, args.port, args.start_index)
+    app = AnomalyDetectorApp(args.host, args.port, args.start_index, args.states_dir)
     app.run()
 
 
