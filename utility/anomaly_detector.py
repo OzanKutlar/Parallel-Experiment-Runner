@@ -36,7 +36,8 @@ from textual.widgets import (
     Tree,
     TabbedContent,
     TabPane,
-    OptionList
+    OptionList,
+    Button
 )
 from textual.widgets.option_list import Option
 
@@ -87,6 +88,7 @@ class CheckingScreen(Screen):
                     with Vertical(id="state-right"):
                         yield Static("[b]State Details[/b]", id="state-right-hdr")
                         yield Static("Scanning for historical state files...", id="state-details")
+                        yield Button("Merge This State", id="btn-merge", variant="success")
 
         with Vertical(id="bottom"):
             yield ProgressBar(id="pbar", total=100, show_eta=True)
@@ -94,6 +96,7 @@ class CheckingScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
+        self.all_data = []
         self.anomalies_list = []
         self.durations = []
         self.states_data = []
@@ -151,16 +154,58 @@ class CheckingScreen(Screen):
                 f"[b]Stopped at ID:[/] {state['max_completed_index'] + 1} (0-indexed: {state['max_completed_index']})",
                 f"[b]Timing Entries Available:[/] {state['timing_entries']}\n",
                 f"[b]Slots In (Matches Live PRE count)?[/] {slot_txt}",
-                f"[b]Matches Total Live Experiments?[/] {match_txt}\n",
-                f"[b]Timings Merged into Live Analysis:[/] [bold yellow]{state['merged_count']}[/]"
+                f"[b]Matches Total Live Experiments?[/] {match_txt}"
             ]
             
+            if state.get('is_merged'):
+                lines.append(f"\n[b]Timings Merged into Live Analysis:[/] [bold yellow]{state['merged_count']}[/]")
+            
             if state['slots_in']:
-                lines.append("\n[dim]This state perfectly aligns with where the live server resumed processing.[/]")
+                lines.append("\n[dim]💡 This state perfectly aligns with where the live server resumed processing.[/]")
             elif state['matches_total']:
-                lines.append("\n[dim]This state matches the parameter space size of the live server.[/]")
+                lines.append("\n[dim]💡 This state matches the parameter space size of the live server.[/]")
                 
             details_panel.update("\n".join(lines))
+            
+            btn = self.query_one("#btn-merge", Button)
+            btn.display = True
+            btn.disabled = state.get('is_merged', False) or state['timing_entries'] == 0
+
+    @on(Button.Pressed, "#btn-merge")
+    def on_merge_pressed(self, event: Button.Pressed) -> None:
+        state_list = self.query_one("#state-list", OptionList)
+        idx = state_list.highlighted
+        if idx is None or idx < 0 or idx >= len(self.states_data):
+            return
+            
+        state = self.states_data[idx]
+        if state.get("is_merged") or state["timing_entries"] == 0:
+            return
+            
+        merged_count = 0
+        for idx_str, t_info in state["raw_timing"].items():
+            try:
+                i = int(idx_str)
+                if 0 <= i < len(self.all_data):
+                    if "Completed At" not in self.all_data[i] and "Completed At" in t_info:
+                        self.all_data[i]["Taken At"] = t_info.get("Taken At")
+                        self.all_data[i]["Completed At"] = t_info.get("Completed At")
+                        self.all_data[i]["historical_merge"] = True
+                        merged_count += 1
+            except ValueError:
+                continue
+                
+        state["merged_count"] = merged_count
+        state["is_merged"] = True
+        
+        # Update Option List visual
+        state_list.replace_option_at(idx, Option(f"[green]★[/] {state['filename']} ({merged_count} merged)", id=f"state-{idx}"))
+        
+        # Re-trigger interaction to update details & disable button
+        self.on_state_interaction(OptionList.OptionHighlighted(state_list, idx))
+        
+        # Re-process
+        self.process_data()
 
     def group_anomalies(self, anomalies, normal_runs):
         anom_freq = {}
@@ -329,26 +374,13 @@ class CheckingScreen(Screen):
                 state_dict["slots_in"] = slots_in
                 state_dict["matches_total"] = matches_total
                 
-                # Merge logic
-                merged_count = 0
-                if matches_total or slots_in:
-                    for idx_str, t_info in timing_info.items():
-                        try:
-                            idx = int(idx_str)
-                            if 0 <= idx < len(all_data):
-                                if "Completed At" not in all_data[idx] and "Completed At" in t_info:
-                                    all_data[idx]["Taken At"] = t_info.get("Taken At")
-                                    all_data[idx]["Completed At"] = t_info.get("Completed At")
-                                    all_data[idx]["historical_merge"] = True
-                                    merged_count += 1
-                        except ValueError:
-                            continue
-                
-                state_dict["merged_count"] = merged_count
+                # Merge logic (Manual, default 0)
+                state_dict["merged_count"] = 0
+                state_dict["is_merged"] = False
                 self.states_data.append(state_dict)
                 
-                marker = "[green]★[/]" if merged_count > 0 else "[dim]○[/]"
-                state_options.append(Option(f"{marker} {state_dict['filename']} ({merged_count} merged)"))
+                marker = "[dim]○[/]"
+                state_options.append(Option(f"{marker} {state_dict['filename']}", id=f"state-{len(self.states_data)-1}"))
                 
             except Exception:
                 continue
@@ -357,18 +389,31 @@ class CheckingScreen(Screen):
             state_list = self.query_one("#state-list", OptionList)
             self.app.call_from_thread(state_list.add_options, state_options)
 
+        self.all_data = all_data
+        self.process_data()
+
+    @work(exclusive=True, thread=True)
+    def process_data(self) -> None:
+        status_w = self.query_one("#status", Static)
+        stats_panel = self.query_one("#stats-panel", Static)
+        pbar = self.query_one("#pbar", ProgressBar)
+        
+        self.durations.clear()
+        self.anomalies_list.clear()
+
         # 5. Parse durations
-        self.app.call_from_thread(setattr, pbar, "total", len(all_data))
+        self.app.call_from_thread(setattr, pbar, "progress", 0)
+        self.app.call_from_thread(setattr, pbar, "total", len(self.all_data))
         self.app.call_from_thread(
             status_w.update,
-            f"  [green]✓ Data Ready[/]  •  [bold]{len(all_data):,}[/] experiments  •  Analyzing durations…",
+            f"  [green]✓ Data Ready[/]  •  [bold]{len(self.all_data):,}[/] experiments  •  Analyzing durations…",
         )
 
         fmt = "%Y-%m-%d %H:%M:%S"
-        batch_size = max(500, len(all_data) // 50)
+        batch_size = max(500, len(self.all_data) // 50)
         advanced = 0
         
-        for i, data in enumerate(all_data):
+        for i, data in enumerate(self.all_data):
             idx = data.get("index", i + 1)
             
             if idx >= getattr(self.app, 'start_index', 0):
@@ -390,12 +435,12 @@ class CheckingScreen(Screen):
                         pass
 
             advanced += 1
-            if advanced >= batch_size or i == len(all_data) - 1:
+            if advanced >= batch_size or i == len(self.all_data) - 1:
                 self.app.call_from_thread(pbar.advance, advanced)
-                pct = (i + 1) / len(all_data) * 100
+                pct = (i + 1) / len(self.all_data) * 100
                 self.app.call_from_thread(
                     status_w.update,
-                    f"  Parsing [bold]{i + 1:,}[/] / [bold]{len(all_data):,}[/]  │  [cyan]{pct:.1f}%[/]",
+                    f"  Parsing [bold]{i + 1:,}[/] / [bold]{len(self.all_data):,}[/]  │  [cyan]{pct:.1f}%[/]",
                 )
                 advanced = 0
 
@@ -442,7 +487,7 @@ class CheckingScreen(Screen):
 
         self.app.call_from_thread(
             status_w.update,
-            f"  [bold green]✓ Done![/]  │  [bold]{len(all_data):,}[/] total  │  "
+            f"  [bold green]✓ Done![/]  │  [bold]{len(self.all_data):,}[/] total  │  "
             f"[yellow]{len(self.durations)}[/] valid times  │  [red]{len(self.anomalies_list)}[/] anomalies found"
         )
 
@@ -503,6 +548,10 @@ class AnomalyDetectorApp(App):
         text-align: center;
         height: 1;
         padding: 0 1;
+    }
+    #btn-merge {
+        margin: 1 2;
+        display: none;
     }
     """
 
